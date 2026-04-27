@@ -17,6 +17,7 @@ This repository turns the original single-script prototype into a maintainable p
 - Added export options (JSON/CSV).
 - Added menu-driven configuration for keywords and locations.
 - Switched to modern, resilient selector strategy (`data-testid`, `role`, `article`, accessibility labels, and fallbacks).
+- Added Instagram location-page fallback that can inspect discovered `/p/` and `/reel/` links for caption/location metadata.
 
 See `docs/update-concept.md` for the direction this repository follows.
 

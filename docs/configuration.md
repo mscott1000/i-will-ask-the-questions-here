@@ -32,3 +32,4 @@ Each collected record stores:
 - Start with precise keywords and locations.
 - Keep intervals reasonable (3–10 seconds) in dynamic feeds.
 - Export before clearing data.
+- On Instagram `explore/locations/*` pages, keep the tab open while logged in so the script can fetch metadata from discovered post links.
