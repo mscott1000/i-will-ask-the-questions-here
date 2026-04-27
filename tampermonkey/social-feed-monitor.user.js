@@ -4,9 +4,9 @@
 // @version      2.0.0
 // @description  Monitors fake social feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
-// @match        https://*.x.com/*
-// @match        https://*.instagram.com/*
-// @match        https://*.facebook.com/*
+// @match        https://www.x.com/*
+// @match        https://www.instagram.com/*
+// @match        https://www.facebook.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
