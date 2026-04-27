@@ -27,9 +27,9 @@ See `docs/update-concept.md` for the direction this repository follows.
 3. Copy/paste into a new Tampermonkey script.
 4. Save and enable.
 5. Visit one of your lab domains:
-   - `*.fritter.com`
-   - `*.finstagram.com`
-   - `*.fakesbook.com`
+   - `*.x.com`
+   - `*.instagram.com`
+   - `*.facebook.com`
 6. Use Tampermonkey menu commands to configure and export data.
 
 ## Notes

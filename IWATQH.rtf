@@ -19,19 +19,19 @@
 \f0\fs29\fsmilli14667 // @version\'a0 \'a0 \'a0 1.0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 // @description\'a0 Scrapes fritter, finstagram, and fakesbook for keywords in specific locations
+\f0\fs29\fsmilli14667 // @description\'a0 Scrapes x, instagram, and facebook for keywords in specific locations
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 // @author \'a0 \'a0 \'a0 You
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 // @match\'a0 \'a0 \'a0 \'a0 https://*.fritter.com/*
+\f0\fs29\fsmilli14667 // @match\'a0 \'a0 \'a0 \'a0 https://*.x.com/*
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 // @match\'a0 \'a0 \'a0 \'a0 https://*.finstagram.com/*
+\f0\fs29\fsmilli14667 // @match\'a0 \'a0 \'a0 \'a0 https://*.instagram.com/*
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 // @match\'a0 \'a0 \'a0 \'a0 https://*.fakesbook.com/*
+\f0\fs29\fsmilli14667 // @match\'a0 \'a0 \'a0 \'a0 https://*.facebook.com/*
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 // @require\'a0 \'a0 \'a0 https://code.jquery.com/jquery-3.6.0.min.js
@@ -114,7 +114,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Current platform (fritter, finstagram, fakesbook)
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Current platform (x, instagram, facebook)
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0platform: getPlatform(),
@@ -212,22 +212,22 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0function getPlatform() \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (window.location.hostname.includes('fritter.com')) \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (window.location.hostname.includes('x.com')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'fritter';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'x';
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\} else if (window.location.hostname.includes('finstagram.com')) \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\} else if (window.location.hostname.includes('instagram.com')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'finstagram';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'instagram';
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\} else if (window.location.hostname.includes('fakesbook.com')) \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\} else if (window.location.hostname.includes('facebook.com')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'fakesbook';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'facebook';
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -264,28 +264,28 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0switch (CONFIG.platform) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fritter':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'x':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0posts = scrapefritter();
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'finstagram':
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0posts = scrapefinstagram();
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0posts = scrapex();
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fakesbook':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'instagram':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0posts = scrapefakesbook();
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0posts = scrapeinstagram();
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'facebook':
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0posts = scrapefacebook();
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
@@ -361,10 +361,10 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// fritter specific scraping
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// x specific scraping
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0function scrapefritter() \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0function scrapex() \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const posts = [];
@@ -373,7 +373,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Try different selectors based on fritter's current structure
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Try different selectors based on x's current structure
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const tweetSelectors = [
@@ -496,7 +496,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0location: locationElement ? locationElement.innerText : extractLocationFromText(textElement.innerText),
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0platform: 'fritter',
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0platform: 'x',
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0url: getTweetUrl(tweet),
@@ -551,10 +551,10 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// finstagram specific scraping
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// instagram specific scraping
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0function scrapefinstagram() \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0function scrapeinstagram() \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const posts = [];
@@ -563,7 +563,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Try different selectors based on finstagram's current structure
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Try different selectors based on instagram's current structure
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const postSelectors = [
@@ -665,7 +665,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const post = \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0id: getfinstagramPostId(element),
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0id: getinstagramPostId(element),
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0text: captionElement.innerText,
@@ -680,10 +680,10 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0location: locationElement ? locationElement.innerText : extractLocationFromText(captionElement.innerText),
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0platform: 'finstagram',
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0platform: 'instagram',
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0url: getfinstagramPostUrl(element),
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0url: getinstagramPostUrl(element),
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0timestamp: Date.now()
@@ -716,7 +716,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\} catch (e) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('Error parsing finstagram post:', e);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('Error parsing instagram post:', e);
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -735,10 +735,10 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// fakesbook specific scraping
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// facebook specific scraping
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 function scrapefakesbook() \{
+\f0\fs29\fsmilli14667 function scrapefacebook() \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const posts = [];
@@ -747,7 +747,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// Try different selectors based on fakesbook's current structure
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0// Try different selectors based on facebook's current structure
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const postSelectors = [
@@ -849,7 +849,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const post = \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0id: getfakesbookPostId(element),
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0id: getfacebookPostId(element),
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0text: textElement.innerText,
@@ -864,10 +864,10 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0location: locationElement ? locationElement.innerText : extractLocationFromText(textElement.innerText),
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0platform: 'fakesbook',
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0platform: 'facebook',
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0url: getfakesbookPostUrl(element),
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0url: getfacebookPostUrl(element),
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0timestamp: Date.now()
@@ -900,7 +900,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\} catch (e) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('Error parsing fakesbook post:', e);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('Error parsing facebook post:', e);
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -971,7 +971,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (linkElement) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'https://fritter.com' + linkElement.getAttribute('href');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'https://x.com' + linkElement.getAttribute('href');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -993,7 +993,7 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 function getfinstagramPostId(element) \{
+\f0\fs29\fsmilli14667 function getinstagramPostId(element) \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0try \{
@@ -1030,7 +1030,7 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 function getfinstagramPostUrl(element) \{
+\f0\fs29\fsmilli14667 function getinstagramPostUrl(element) \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0try \{
@@ -1042,7 +1042,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (linkElement) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'https://finstagram.com' + linkElement.getAttribute('href');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return 'https://instagram.com' + linkElement.getAttribute('href');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -1064,7 +1064,7 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 function getfakesbookPostId(element) \{
+\f0\fs29\fsmilli14667 function getfacebookPostId(element) \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0try \{
@@ -1113,7 +1113,7 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 function getfakesbookPostUrl(element) \{
+\f0\fs29\fsmilli14667 function getfacebookPostUrl(element) \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0try \{
@@ -2853,46 +2853,46 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const fritterOption = document.createElement('option');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const xOption = document.createElement('option');
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0fritterOption.value = 'fritter';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0xOption.value = 'x';
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0fritterOption.textContent = 'fritter';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0xOption.textContent = 'x';
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0platformSelect.appendChild(fritterOption);
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const finstagramOption = document.createElement('option');
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0finstagramOption.value = 'finstagram';
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0finstagramOption.textContent = 'finstagram';
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0platformSelect.appendChild(finstagramOption);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0platformSelect.appendChild(xOption);
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const fakesbookOption = document.createElement('option');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const instagramOption = document.createElement('option');
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0fakesbookOption.value = 'fakesbook';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0instagramOption.value = 'instagram';
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0fakesbookOption.textContent = 'fakesbook';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0instagramOption.textContent = 'instagram';
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0platformSelect.appendChild(fakesbookOption);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0platformSelect.appendChild(instagramOption);
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0const facebookOption = document.createElement('option');
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0facebookOption.value = 'facebook';
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0facebookOption.textContent = 'facebook';
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0platformSelect.appendChild(facebookOption);
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0
@@ -3043,22 +3043,22 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0switch (CONFIG.platform) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fritter':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'x':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return loginTofritter();
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return loginTox();
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'finstagram':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'instagram':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return loginTofinstagram();
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return loginToinstagram();
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fakesbook':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'facebook':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return loginTofakesbook();
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return loginTofacebook();
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0default:
@@ -3089,7 +3089,7 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 function loginTofritter() \{
+\f0\fs29\fsmilli14667 function loginTox() \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0try \{
@@ -3101,7 +3101,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('Already logged in to fritter');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('Already logged in to x');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return true;
@@ -3119,7 +3119,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (!window.location.href.includes('/login')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://fritter.com/login';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://x.com/login';
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return false; // Will retry after navigation
@@ -3218,7 +3218,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('fritter login initiated');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('x login initiated');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return true;
@@ -3245,7 +3245,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\} catch (error) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('fritter login error:', error);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('x login error:', error);
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return false;
@@ -3258,7 +3258,7 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 function loginTofinstagram() \{
+\f0\fs29\fsmilli14667 function loginToinstagram() \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0try \{
@@ -3273,7 +3273,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0document.querySelector('svg[aria-label="Menu"]')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('Already logged in to finstagram');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('Already logged in to instagram');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return true;
@@ -3291,7 +3291,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (!window.location.href.includes('/accounts/login/')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.finstagram.com/accounts/login/';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.instagram.com/accounts/login/';
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return false; // Will retry after navigation
@@ -3360,7 +3360,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('finstagram login initiated');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('instagram login initiated');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return true;
@@ -3378,7 +3378,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\} catch (error) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('finstagram login error:', error);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('instagram login error:', error);
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return false;
@@ -3391,7 +3391,7 @@
 \f1\fs24 \
 \
 
-\f0\fs29\fsmilli14667 function loginTofakesbook() \{
+\f0\fs29\fsmilli14667 function loginTofacebook() \{
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0try \{
@@ -3406,7 +3406,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0document.querySelector('[data-click="profile_icon"]')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('Already logged in to fakesbook');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('Already logged in to facebook');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return true;
@@ -3424,7 +3424,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (!window.location.href.includes('/login')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.fakesbook.com/login';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.facebook.com/login';
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return false; // Will retry after navigation
@@ -3496,7 +3496,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('fakesbook login initiated');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.log('facebook login initiated');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return true;
@@ -3514,7 +3514,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\} catch (error) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('fakesbook login error:', error);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.error('facebook login error:', error);
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0return false;
@@ -3542,7 +3542,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0switch (CONFIG.platform) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fritter':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'x':
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0isLoggedIn = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]') !== null;
@@ -3551,7 +3551,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'finstagram':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'instagram':
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0isLoggedIn = document.querySelector('[data-testid="user-menu"]') !== null ||\'a0
@@ -3563,7 +3563,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fakesbook':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'facebook':
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0isLoggedIn = document.querySelector('[aria-label="Account"]') !== null ||\'a0
@@ -3621,37 +3621,37 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0switch (CONFIG.platform) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fritter':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'x':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Use fritter search with location parameter
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Use x search with location parameter
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = `https://fritter.com/search?q=$\{encodeURIComponent(location)\}&src=typed_query`;
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'finstagram':
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Use finstagram location tags search
-\f1\fs24 \
-
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = `https://www.finstagram.com/explore/locations/$\{encodeURIComponent(location)\}`;
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = `https://x.com/search?q=$\{encodeURIComponent(location)\}&src=typed_query`;
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fakesbook':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'instagram':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Use fakesbook Graph Search for location
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Use instagram location tags search
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = `https://www.fakesbook.com/search/pages/?q=$\{encodeURIComponent(location)\}`;
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = `https://www.instagram.com/explore/locations/$\{encodeURIComponent(location)\}`;
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'facebook':
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Use facebook Graph Search for location
+\f1\fs24 \
+
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = `https://www.facebook.com/search/pages/?q=$\{encodeURIComponent(location)\}`;
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0break;
@@ -3965,10 +3965,10 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0switch (CONFIG.platform) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fritter':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'x':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// If on fritter, navigate to home or search page
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// If on x, navigate to home or search page
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (!window.location.href.includes('/home') &&\'a0
@@ -3980,7 +3980,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0!window.location.href.includes('/explore')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://fritter.com/home';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://x.com/home';
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -3992,10 +3992,10 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'finstagram':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'instagram':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// If on finstagram, navigate to home or explore page
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// If on instagram, navigate to home or explore page
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (!window.location.href.includes('/explore') &&\'a0
@@ -4004,7 +4004,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0!window.location.href.includes('/')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.finstagram.com/';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.instagram.com/';
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -4016,10 +4016,10 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fakesbook':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'facebook':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// If on fakesbook, navigate to home or news feed
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// If on facebook, navigate to home or news feed
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (!window.location.href.includes('/home') &&\'a0
@@ -4028,7 +4028,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0!window.location.href.includes('/')) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.fakesbook.com/';
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0window.location.href = 'https://www.facebook.com/';
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -4065,13 +4065,13 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0switch (CONFIG.platform) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fritter':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'x':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Check if fritter UI elements are present
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Check if x UI elements are present
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const fritterElements = [
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const xElements = [
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0'[data-testid="tweet"]',
@@ -4089,7 +4089,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const fritterElementsMissing = fritterElements.filter(
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const xElementsMissing = xElements.filter(
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0selector => document.querySelector(selector) === null
@@ -4101,13 +4101,13 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (fritterElementsMissing.length > 0) \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (xElementsMissing.length > 0) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.warn('fritter UI may have changed, missing elements:', fritterElementsMissing);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.warn('x UI may have changed, missing elements:', xElementsMissing);
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0GM_notification('fritter UI may have changed. Scraper may need updating.', 'Social Media Scraper');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0GM_notification('x UI may have changed. Scraper may need updating.', 'Social Media Scraper');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -4119,13 +4119,13 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'finstagram':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'instagram':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Check if finstagram UI elements are present
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Check if instagram UI elements are present
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const finstagramElements = [
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const instagramElements = [
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0'article',
@@ -4143,7 +4143,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const finstagramElementsMissing = finstagramElements.filter(
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const instagramElementsMissing = instagramElements.filter(
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0selector => document.querySelector(selector) === null
@@ -4155,13 +4155,13 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (finstagramElementsMissing.length > 0) \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (instagramElementsMissing.length > 0) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.warn('finstagram UI may have changed, missing elements:', finstagramElementsMissing);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.warn('instagram UI may have changed, missing elements:', instagramElementsMissing);
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0GM_notification('finstagram UI may have changed. Scraper may need updating.', 'Social Media Scraper');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0GM_notification('instagram UI may have changed. Scraper may need updating.', 'Social Media Scraper');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}
@@ -4173,13 +4173,13 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'fakesbook':
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0case 'facebook':
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Check if fakesbook UI elements are present
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0// Check if facebook UI elements are present
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const fakesbookElements = [
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const facebookElements = [
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0'[role="article"]',
@@ -4197,7 +4197,7 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const fakesbookElementsMissing = fakesbookElements.filter(
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0const facebookElementsMissing = facebookElements.filter(
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0selector => document.querySelector(selector) === null
@@ -4209,13 +4209,13 @@
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (fakesbookElementsMissing.length > 0) \{
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0if (facebookElementsMissing.length > 0) \{
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.warn('fakesbook UI may have changed, missing elements:', fakesbookElementsMissing);
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0console.warn('facebook UI may have changed, missing elements:', facebookElementsMissing);
 \f1\fs24 \
 
-\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0GM_notification('fakesbook UI may have changed. Scraper may need updating.', 'Social Media Scraper');
+\f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0GM_notification('facebook UI may have changed. Scraper may need updating.', 'Social Media Scraper');
 \f1\fs24 \
 
 \f0\fs29\fsmilli14667 \'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\}

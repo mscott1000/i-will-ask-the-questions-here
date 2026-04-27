@@ -209,7 +209,7 @@ function scrapeGenericFeed(platformConfig) {
 Then each fake site gets a config:
 
 const PLATFORM_CONFIGS = {
-    fritter: {
+    x: {
         postSelectors: ['[data-testid="tweet"]', '[role="article"]', 'article'],
         textSelectors: ['[data-testid="tweetText"]', '[lang]', '.post-content'],
         userSelectors: ['[data-testid="User-Name"]', '[data-author]', 'a[href^="/@"]'],
@@ -218,7 +218,7 @@ const PLATFORM_CONFIGS = {
         postUrlPattern: '/status/'
     },
 
-    finstagram: {
+    instagram: {
         postSelectors: ['article', '[data-testid="post"]', '[role="article"]'],
         textSelectors: ['[data-testid="post-caption"]', '[aria-label="Caption"]', '.caption'],
         userSelectors: ['[data-testid="post-username"]', 'a[href^="/"]'],
@@ -227,7 +227,7 @@ const PLATFORM_CONFIGS = {
         postUrlPattern: '/p/'
     },
 
-    fakesbook: {
+    facebook: {
         postSelectors: ['[role="article"]', '[data-testid="post"]', 'article'],
         textSelectors: ['[data-testid="post_message"]', '[data-ad-preview="message"]', '.post-content'],
         userSelectors: ['[data-testid="story-subtitle"]', '[data-author]', 'strong a'],
@@ -265,7 +265,7 @@ A better fake-lab design is to store account tokens like:
 {
   username: "bot_001",
   token: "lab-token-001",
-  platform: "fritter"
+  platform: "x"
 }
 
 instead of pretending to store real passwords. That keeps the lesson focused on credential rotation without encouraging bad password handling.
@@ -419,7 +419,7 @@ Used by checkLoginStatus().
 
 For your fake websites, this is fine if login automation is part of the course. But if the fake sites simply simulate being logged in, remove it.
 
-loginTofritter(), loginTofinstagram(), loginTofakesbook()
+loginTox(), loginToinstagram(), loginTofacebook()
 
 Used through performLogin().
 

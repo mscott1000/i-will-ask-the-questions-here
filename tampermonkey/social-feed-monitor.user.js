@@ -4,9 +4,9 @@
 // @version      2.0.0
 // @description  Monitors fake social feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
-// @match        https://*.fritter.com/*
-// @match        https://*.finstagram.com/*
-// @match        https://*.fakesbook.com/*
+// @match        https://*.x.com/*
+// @match        https://*.instagram.com/*
+// @match        https://*.facebook.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
@@ -73,9 +73,9 @@
 
   function detectPlatform() {
     const host = window.location.hostname;
-    if (host.includes('fritter.com')) return 'fritter';
-    if (host.includes('finstagram.com')) return 'finstagram';
-    if (host.includes('fakesbook.com')) return 'fakesbook';
+    if (host.includes('x.com')) return 'x';
+    if (host.includes('instagram.com')) return 'instagram';
+    if (host.includes('facebook.com')) return 'facebook';
     return 'unknown';
   }
 
