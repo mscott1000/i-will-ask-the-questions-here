@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Social Feed Monitor (Lab)
 // @namespace    http://tampermonkey.net/
-// @version      2.1.0
+// @version      2.2.0
 // @description  Monitors fake social feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
@@ -18,6 +18,8 @@
   'use strict';
 
   const LAST_UPDATED = '2026-04-27';
+  const HALF_HOUR_MS = 30 * 60 * 1000;
+  const MIN_INTERVAL_MS = 60 * 1000;
 
   const STORAGE_KEYS = {
     data: 'sfm_scraped_posts',
@@ -30,7 +32,7 @@
   const DEFAULTS = {
     keywords: ['example', 'keyword'],
     locations: ['new york', 'los angeles', 'chicago'],
-    checkInterval: 5000,
+    checkInterval: HALF_HOUR_MS,
     maxPostsPerCheck: 50
   };
 
@@ -69,7 +71,8 @@
     checkInterval: loadNumber(STORAGE_KEYS.checkInterval, DEFAULTS.checkInterval),
     enabled: GM_getValue(STORAGE_KEYS.enabled, true),
     instagramFetchedUrls: new Set(),
-    timer: null
+    timer: null,
+    ui: null
   };
 
   function detectPlatform() {
@@ -326,14 +329,12 @@
     if (state.timer) clearInterval(state.timer);
     state.timer = setInterval(scrapeOnce, state.checkInterval);
     setTimeout(scrapeOnce, 1500);
+    updateStatusText();
   }
 
-  function promptCsvList(label, current) {
-    const input = window.prompt(`${label} (comma-separated):`, current.join(', '));
-    if (input === null) return null;
-
-    return input
-      .split(',')
+  function splitListInput(input) {
+    return String(input || '')
+      .split(/[,\n]/)
       .map((item) => item.trim())
       .filter(Boolean);
   }
@@ -399,75 +400,148 @@
     saveBlob(rows.join('\n'), filename, 'text/csv;charset=utf-8');
   }
 
-  function registerMenu() {
-    GM_registerMenuCommand('Set Keywords', () => {
-      const values = promptCsvList('Keywords', state.keywords);
-      if (!values) return;
-      state.keywords = values;
-      GM_setValue(STORAGE_KEYS.keywords, values);
-      GM_notification({ title: 'Social Feed Monitor', text: `Saved ${values.length} keyword(s).` });
+  function statusLines() {
+    const count = loadStoredPosts().length;
+    return [
+      `Platform: ${state.platform}`,
+      `Enabled: ${state.enabled ? 'Yes' : 'No'}`,
+      `Stored posts: ${count}`,
+      `Keywords: ${state.keywords.join(', ') || '(none)'}`,
+      `Locations: ${state.locations.join(', ') || '(none)'}`,
+      `Check interval: ${Math.round(state.checkInterval / 60000)} minute(s)`,
+      `Last updated: ${LAST_UPDATED}`
+    ];
+  }
+
+  function updateStatusText() {
+    if (!state.ui?.status) return;
+    state.ui.status.textContent = statusLines().join('\n');
+  }
+
+  function createPopupUI() {
+    const style = document.createElement('style');
+    style.textContent = `
+      #sfm-toggle-btn{position:fixed;right:16px;bottom:16px;z-index:2147483646;background:#0a66c2;color:#fff;border:none;border-radius:999px;padding:10px 14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+      #sfm-panel{position:fixed;right:16px;bottom:64px;z-index:2147483646;width:340px;max-height:80vh;overflow:auto;background:#fff;color:#111;border:1px solid #ddd;border-radius:12px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);font:13px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}
+      #sfm-panel.sfm-hidden{display:none}
+      #sfm-panel h3{margin:0 0 8px;font-size:15px}
+      #sfm-panel label{display:block;margin:8px 0 4px;font-weight:600}
+      #sfm-panel textarea,#sfm-panel input[type="number"]{width:100%;box-sizing:border-box;padding:8px;border:1px solid #bbb;border-radius:8px}
+      #sfm-panel textarea{min-height:62px;resize:vertical}
+      #sfm-panel .sfm-row{display:flex;gap:8px;align-items:center}
+      #sfm-panel .sfm-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+      #sfm-panel button{border:1px solid #ccc;border-radius:8px;background:#f7f7f7;padding:8px;cursor:pointer}
+      #sfm-panel button.sfm-primary{background:#0a66c2;color:#fff;border-color:#0a66c2}
+      #sfm-status{white-space:pre-wrap;background:#f5f7fa;border-radius:8px;padding:8px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px}
+    `;
+    document.head.appendChild(style);
+
+    const toggle = document.createElement('button');
+    toggle.id = 'sfm-toggle-btn';
+    toggle.textContent = 'SFM';
+
+    const panel = document.createElement('div');
+    panel.id = 'sfm-panel';
+    panel.classList.add('sfm-hidden');
+    panel.innerHTML = `
+      <h3>Social Feed Monitor</h3>
+      <div class="sfm-row"><input id="sfm-enabled" type="checkbox" /><label for="sfm-enabled" style="margin:0">Enable monitor</label></div>
+      <label for="sfm-keywords">Keywords (comma or new line)</label>
+      <textarea id="sfm-keywords"></textarea>
+      <label for="sfm-locations">Locations (comma or new line)</label>
+      <textarea id="sfm-locations"></textarea>
+      <label for="sfm-interval">Automatic check interval (minutes)</label>
+      <input id="sfm-interval" type="number" min="1" step="1" />
+      <div class="sfm-actions">
+        <button id="sfm-save" class="sfm-primary">Save settings</button>
+        <button id="sfm-half-hour">Use 30 minutes</button>
+        <button id="sfm-run-now">Run now</button>
+        <button id="sfm-status-btn">Show status</button>
+        <button id="sfm-export-json">Export JSON</button>
+        <button id="sfm-export-csv">Export CSV</button>
+        <button id="sfm-clear">Clear stored data</button>
+      </div>
+      <pre id="sfm-status"></pre>
+    `;
+    document.body.appendChild(toggle);
+    document.body.appendChild(panel);
+
+    const enabled = panel.querySelector('#sfm-enabled');
+    const keywords = panel.querySelector('#sfm-keywords');
+    const locations = panel.querySelector('#sfm-locations');
+    const interval = panel.querySelector('#sfm-interval');
+    const status = panel.querySelector('#sfm-status');
+
+    state.ui = { panel, enabled, keywords, locations, interval, status };
+
+    function hydrate() {
+      enabled.checked = state.enabled;
+      keywords.value = state.keywords.join(', ');
+      locations.value = state.locations.join(', ');
+      interval.value = String(Math.max(1, Math.round(state.checkInterval / 60000)));
+      updateStatusText();
+    }
+
+    toggle.addEventListener('click', () => {
+      panel.classList.toggle('sfm-hidden');
+      hydrate();
     });
 
-    GM_registerMenuCommand('Set Locations', () => {
-      const values = promptCsvList('Locations', state.locations);
-      if (!values) return;
-      state.locations = values.map(normalizeToken);
-      GM_setValue(STORAGE_KEYS.locations, values);
-      GM_notification({ title: 'Social Feed Monitor', text: `Saved ${values.length} location token(s).` });
-    });
-
-    GM_registerMenuCommand('Set Check Interval (ms)', () => {
-      const input = window.prompt('Check interval in milliseconds:', String(state.checkInterval));
-      if (input === null) return;
-      const ms = Number(input);
-      if (!Number.isFinite(ms) || ms < 500) {
-        window.alert('Please use a value >= 500 ms.');
+    panel.querySelector('#sfm-save').addEventListener('click', () => {
+      const newKeywords = splitListInput(keywords.value);
+      const newLocations = splitListInput(locations.value).map(normalizeToken);
+      const minutes = Number(interval.value);
+      if (!Number.isFinite(minutes) || minutes < 1) {
+        window.alert('Interval must be 1 minute or more.');
         return;
       }
-      state.checkInterval = ms;
-      GM_setValue(STORAGE_KEYS.checkInterval, ms);
-      startMonitor();
-      GM_notification({ title: 'Social Feed Monitor', text: `Interval updated to ${ms}ms.` });
-    });
 
-    GM_registerMenuCommand('Enable / Disable Monitor', () => {
-      state.enabled = !state.enabled;
+      state.enabled = enabled.checked;
+      state.keywords = newKeywords;
+      state.locations = newLocations;
+      state.checkInterval = Math.max(MIN_INTERVAL_MS, Math.round(minutes * 60000));
       GM_setValue(STORAGE_KEYS.enabled, state.enabled);
-      GM_notification({
-        title: 'Social Feed Monitor',
-        text: state.enabled ? 'Monitor enabled.' : 'Monitor disabled.'
-      });
+      GM_setValue(STORAGE_KEYS.keywords, newKeywords);
+      GM_setValue(STORAGE_KEYS.locations, newLocations);
+      GM_setValue(STORAGE_KEYS.checkInterval, state.checkInterval);
+      startMonitor();
+      GM_notification({ title: 'Social Feed Monitor', text: 'Settings saved.' });
+      hydrate();
     });
 
-    GM_registerMenuCommand('Export Data (JSON)', exportJson);
-    GM_registerMenuCommand('Export Data (CSV)', exportCsv);
-
-    GM_registerMenuCommand('Clear Stored Data', () => {
-      if (window.confirm('Delete all locally stored captured posts?')) {
-        GM_deleteValue(STORAGE_KEYS.data);
-        GM_notification({ title: 'Social Feed Monitor', text: 'Stored data cleared.' });
-      }
+    panel.querySelector('#sfm-half-hour').addEventListener('click', () => {
+      interval.value = '30';
     });
 
-    GM_registerMenuCommand('Show Status', () => {
-      const count = loadStoredPosts().length;
-      window.alert(
-        [
-          `Platform: ${state.platform}`,
-          `Enabled: ${state.enabled}`,
-          `Stored posts: ${count}`,
-          `Keywords: ${state.keywords.join(', ') || '(none)'}`,
-          `Locations: ${state.locations.join(', ') || '(none)'}`,
-          `Check interval: ${state.checkInterval}ms`,
-          `Last updated: ${LAST_UPDATED}`
-        ].join('\n')
-      );
+    panel.querySelector('#sfm-run-now').addEventListener('click', async () => {
+      await scrapeOnce();
+      updateStatusText();
     });
+
+    panel.querySelector('#sfm-status-btn').addEventListener('click', () => {
+      window.alert(statusLines().join('\n'));
+      updateStatusText();
+    });
+    panel.querySelector('#sfm-export-json').addEventListener('click', exportJson);
+    panel.querySelector('#sfm-export-csv').addEventListener('click', exportCsv);
+    panel.querySelector('#sfm-clear').addEventListener('click', () => {
+      if (!window.confirm('Delete all locally stored captured posts?')) return;
+      GM_deleteValue(STORAGE_KEYS.data);
+      GM_notification({ title: 'Social Feed Monitor', text: 'Stored data cleared.' });
+      updateStatusText();
+    });
+
+    GM_registerMenuCommand('Open Social Feed Monitor Panel', () => {
+      panel.classList.remove('sfm-hidden');
+      hydrate();
+    });
+
+    hydrate();
   }
 
   function initialize() {
     console.log(`[SFM] Starting on ${state.platform}. Last updated ${LAST_UPDATED}.`);
-    registerMenu();
+    createPopupUI();
     startMonitor();
   }
 
