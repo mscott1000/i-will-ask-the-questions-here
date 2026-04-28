@@ -98,7 +98,9 @@
     searchIndex: loadNumber(STORAGE_KEYS.searchIndex, 0),
     instagramFetchedUrls: new Set(),
     timer: null,
-    ui: null
+    ui: null,
+    hardStopped: false,
+    activeFetchController: null
   };
 
   function detectPlatform() {
@@ -265,8 +267,8 @@
     return { user: onInstagram ? onInstagram[1].trim() : 'unknown', text: quoted ? quoted[1].trim() : description.trim() };
   }
 
-  async function fetchInstagramPostDetails(postUrl, fallbackLocation) {
-    const response = await fetch(postUrl, { credentials: 'include' });
+  async function fetchInstagramPostDetails(postUrl, fallbackLocation, signal) {
+    const response = await fetch(postUrl, { credentials: 'include', signal });
     if (!response.ok) return null;
 
     const html = await response.text();
@@ -297,7 +299,7 @@
   }
 
   async function scrapeInstagramLocationPage() {
-    if (state.platform !== 'instagram') return [];
+    if (state.hardStopped || state.platform !== 'instagram') return [];
     if (!window.location.pathname.includes('/explore/locations/')) return [];
 
     const fallbackLocation = deriveLocationFromPathname();
@@ -307,11 +309,13 @@
 
     const found = [];
     for (const url of pendingLinks) {
+      if (state.hardStopped) break;
       state.instagramFetchedUrls.add(url);
       try {
-        const post = await fetchInstagramPostDetails(url, fallbackLocation);
+        const post = await fetchInstagramPostDetails(url, fallbackLocation, state.activeFetchController?.signal);
         if (post) found.push(post);
       } catch (error) {
+        if (error?.name === 'AbortError') return found;
         console.debug('[SFM] Unable to fetch Instagram post details:', url, error);
       }
     }
@@ -368,7 +372,7 @@
   }
 
   function maybeRotateSearchPage() {
-    if (!state.autoRotateSearch) return;
+    if (state.hardStopped || !state.autoRotateSearch) return;
 
     const urls = buildSearchUrls();
     if (urls.length === 0) return;
@@ -384,25 +388,49 @@
   }
 
   async function scrapeOnce() {
-    if (!state.enabled) return;
+    if (!state.enabled || state.hardStopped) return;
 
-    const parsed = allPosts().map(parsePost).filter(Boolean);
-    const instagramLocationMatches = await scrapeInstagramLocationPage();
-    parsed.push(...instagramLocationMatches);
-    const added = appendWithDedupe(parsed);
+    state.activeFetchController = new AbortController();
 
-    if (added > 0) {
-      console.log(`[SFM] Added ${added} post(s). Total stored: ${loadStoredPosts().length}`);
-      GM_notification({ title: 'Social Feed Monitor', text: `Captured ${added} new matching post(s).`, timeout: 2000 });
+    try {
+      const parsed = allPosts().map(parsePost).filter(Boolean);
+      const instagramLocationMatches = await scrapeInstagramLocationPage();
+      parsed.push(...instagramLocationMatches);
+      if (state.hardStopped) return;
+      const added = appendWithDedupe(parsed);
+
+      if (added > 0) {
+        console.log(`[SFM] Added ${added} post(s). Total stored: ${loadStoredPosts().length}`);
+        GM_notification({ title: 'Social Feed Monitor', text: `Captured ${added} new matching post(s).`, timeout: 2000 });
+      }
+
+      maybeRotateSearchPage();
+    } finally {
+      state.activeFetchController = null;
     }
-
-    maybeRotateSearchPage();
   }
 
   function startMonitor() {
+    if (state.hardStopped) return;
     if (state.timer) clearInterval(state.timer);
     state.timer = setInterval(scrapeOnce, state.checkInterval);
     setTimeout(scrapeOnce, 1500);
+    updateStatusText();
+  }
+
+  function hardStopMonitor() {
+    state.hardStopped = true;
+    state.enabled = false;
+    GM_setValue(STORAGE_KEYS.enabled, false);
+    if (state.timer) {
+      clearInterval(state.timer);
+      state.timer = null;
+    }
+    if (state.activeFetchController) {
+      state.activeFetchController.abort();
+      state.activeFetchController = null;
+    }
+    GM_notification({ title: 'Social Feed Monitor', text: 'Emergency stop activated. All monitor tasks halted.' });
     updateStatusText();
   }
 
@@ -467,6 +495,7 @@
     return [
       `Platform: ${state.platform}`,
       `Enabled: ${state.enabled ? 'Yes' : 'No'}`,
+      `Hard stopped: ${state.hardStopped ? 'Yes' : 'No'}`,
       `Stored posts: ${count}`,
       `Keywords: ${state.keywords.join(', ') || '(none)'}`,
       `Locations: ${state.locations.join(', ') || '(none)'}`,
@@ -495,6 +524,7 @@
       #sfm-panel .sfm-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
       #sfm-panel button{border:1px solid #ccc;border-radius:8px;background:#f7f7f7;padding:8px;cursor:pointer}
       #sfm-panel button.sfm-primary{background:#0a66c2;color:#fff;border-color:#0a66c2}
+      #sfm-panel button.sfm-danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
       #sfm-status{white-space:pre-wrap;background:#f5f7fa;border-radius:8px;padding:8px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px}
     `;
     document.head.appendChild(style);
@@ -524,6 +554,7 @@
         <button id="sfm-export-json">Export JSON</button>
         <button id="sfm-export-csv">Export CSV</button>
         <button id="sfm-clear">Clear stored data</button>
+        <button id="sfm-stop" class="sfm-danger">HARD STOP</button>
       </div>
       <pre id="sfm-status"></pre>
     `;
@@ -545,6 +576,10 @@
       keywords.value = state.keywords.join(', ');
       locations.value = state.locations.join(', ');
       interval.value = String(Math.max(1, Math.round(state.checkInterval / 60000)));
+      const controls = [enabled, autoRotate, keywords, locations, interval];
+      controls.forEach((el) => {
+        el.disabled = state.hardStopped;
+      });
       updateStatusText();
     }
 
@@ -554,6 +589,7 @@
     });
 
     panel.querySelector('#sfm-save').addEventListener('click', () => {
+      if (state.hardStopped) return;
       const newKeywords = splitListInput(keywords.value);
       const newLocations = splitListInput(locations.value).map(normalizeToken);
       const minutes = Number(interval.value);
@@ -578,10 +614,12 @@
     });
 
     panel.querySelector('#sfm-half-hour').addEventListener('click', () => {
+      if (state.hardStopped) return;
       interval.value = '30';
     });
 
     panel.querySelector('#sfm-run-now').addEventListener('click', async () => {
+      if (state.hardStopped) return;
       await scrapeOnce();
       updateStatusText();
     });
@@ -597,6 +635,11 @@
       GM_deleteValue(STORAGE_KEYS.data);
       GM_notification({ title: 'Social Feed Monitor', text: 'Stored data cleared.' });
       updateStatusText();
+    });
+    panel.querySelector('#sfm-stop').addEventListener('click', () => {
+      if (!window.confirm('Hard stop now? This immediately halts all monitor activity until the page is reloaded.')) return;
+      hardStopMonitor();
+      hydrate();
     });
 
     GM_registerMenuCommand('Open Social Feed Monitor Panel', () => {
