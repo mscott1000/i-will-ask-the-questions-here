@@ -15,7 +15,8 @@ This repository turns the original single-script prototype into a maintainable p
 - Removed server/database dependency from the default workflow.
 - Added persistent local storage (`GM_setValue`) with dedupe.
 - Added export options (JSON/CSV).
-- Added menu-driven configuration for keywords and locations.
+- Replaced Tampermonkey dropdown controls with an in-page popup control panel.
+- Defaulted automatic monitoring cadence to every 30 minutes (with editable interval in the popup).
 - Switched to modern, resilient selector strategy (`data-testid`, `role`, `article`, accessibility labels, and fallbacks).
 - Added Instagram location-page fallback that can inspect discovered `/p/` and `/reel/` links for caption/location metadata.
 
@@ -31,7 +32,7 @@ See `docs/update-concept.md` for the direction this repository follows.
    - `*.x.com`
    - `*.instagram.com`
    - `*.facebook.com`
-6. Use Tampermonkey menu commands to configure and export data.
+6. Click the **SFM** button that appears in the bottom-right corner to open the popup controls.
 
 ## Notes
 
