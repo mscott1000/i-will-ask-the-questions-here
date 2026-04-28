@@ -32,6 +32,7 @@ See `docs/update-concept.md` for the direction this repository follows.
    - `*.x.com`
    - `*.instagram.com`
    - `*.facebook.com`
+   - `*.google.com`
 6. Click the **SFM** button that appears in the bottom-right corner to open the popup controls.
 
 ## Notes

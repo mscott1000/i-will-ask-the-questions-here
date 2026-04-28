@@ -5,6 +5,7 @@ Use the in-page **SFM** popup while on a matched site.
 ## Popup controls
 
 - **Enable monitor** – turn automated monitoring on/off.
+- **Auto-rotate search pages each cycle** – when enabled, every scan cycle advances to the next Google/Instagram/Facebook search URL.
 - **Keywords** – comma/newline-separated terms to search in post text.
 - **Locations** – comma/newline-separated location tokens to match in text/location fields.
 - **Automatic check interval (minutes)** – scraping cadence (default: **30 minutes**).
@@ -33,5 +34,6 @@ Each collected record stores:
 
 - Start with precise keywords and locations.
 - Keep the default 30-minute cadence for hands-off automation unless your lab needs a faster interval.
+- For concept-driven prospecting, keep **Auto-rotate search pages each cycle** enabled so the script continuously walks through its expanded search plans.
 - Export before clearing data.
 - On Instagram `explore/locations/*` pages, keep the tab open while logged in so the script can fetch metadata from discovered post links.
