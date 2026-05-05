@@ -19,7 +19,7 @@
   'use strict';
 
   const LAST_UPDATED = '2026-04-28';
-  const HALF_HOUR_MS = 30 * 60 * 1000;
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
   const MIN_INTERVAL_MS = 60 * 1000;
 
   const STORAGE_KEYS = {
@@ -62,18 +62,10 @@
     '"open mic" "weekly event"', '"midweek event ideas"'
   ];
 
-  const INSTAGRAM_HASHTAGS = [
-    'stltrivia', 'stlouistrivia', 'trivianightstl', 'stlouisbar', 'stlbars', 'stlrestaurants', 'stlnightlife',
-    'stlevents', 'southcitystl', 'soulard', 'thegrovestl', 'towergrove', 'maplewoodmo', 'dogtownstl', 'centralwestend',
-    'stlhappyhour', 'stlfoodscene', 'stlbarlife', 'stlcommunity', 'stlbusiness', 'stlentertainment', 'stllocal',
-    'stcharlesmo', 'metroeast', 'stlouissmallbusiness', 'stlweekend', 'stlmidweek', 'stlpub', 'stlrestaurantscene',
-    'stlnightout', 'stlbeverages', 'stlvenue'
-  ];
-
   const DEFAULTS = {
     keywords: DEFAULT_KEYWORDS,
     locations: DEFAULT_LOCATIONS,
-    checkInterval: HALF_HOUR_MS,
+    checkInterval: TWO_HOURS_MS,
     maxPostsPerCheck: 50
   };
 
@@ -180,6 +172,36 @@
     return tokens.filter((token) => token && normalized.includes(token));
   }
 
+  function inferPlatformFromUrl(url) {
+    const value = String(url || '').toLowerCase();
+    if (value.includes('facebook.com')) return 'facebook';
+    if (value.includes('instagram.com')) return 'instagram';
+    if (value.includes('x.com') || value.includes('twitter.com')) return 'x';
+    return 'google';
+  }
+
+  function parseRelativeTimeLabel(label, capturedAtIso) {
+    const text = String(label || '').trim().toLowerCase();
+    if (!text) return null;
+    const now = new Date(capturedAtIso);
+    if (Number.isNaN(now.getTime())) return null;
+    const match = text.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago/i);
+    if (!match) return null;
+    const amount = Number(match[1]);
+    const unit = match[2].toLowerCase();
+    const unitMs = {
+      second: 1000,
+      minute: 60 * 1000,
+      hour: 60 * 60 * 1000,
+      day: 24 * 60 * 60 * 1000,
+      week: 7 * 24 * 60 * 60 * 1000,
+      month: 30 * 24 * 60 * 60 * 1000,
+      year: 365 * 24 * 60 * 60 * 1000
+    }[unit];
+    if (!unitMs) return null;
+    return new Date(now.getTime() - (amount * unitMs)).toISOString();
+  }
+
   function parseGoogleResult(element) {
     const title = textFrom(element, SELECTOR_CONFIG.googleTitle);
     const snippet = textFrom(element, SELECTOR_CONFIG.googleSnippet);
@@ -191,15 +213,18 @@
     const matchedLocations = matchesTokens(text, state.locations);
     if (matchedKeywords.length === 0 || matchedLocations.length === 0) return null;
 
+    const capturedAt = new Date().toISOString();
+    const relativeTime = snippet.match(/(?:\b\d+\s*(?:second|minute|hour|day|week|month|year)s?\s+ago\b)/i)?.[0] || '';
+
     return {
       id: `${link}|${title}`.slice(0, 240),
-      platform: state.platform,
+      platform: inferPlatformFromUrl(link),
       user: 'google-result',
       text,
       location: null,
       url: link,
-      time: null,
-      capturedAt: new Date().toISOString(),
+      time: parseRelativeTimeLabel(relativeTime, capturedAt) || null,
+      capturedAt,
       matchedKeywords,
       matchedLocations
     };
@@ -357,18 +382,17 @@
   function buildSearchUrls() {
     const locations = state.locations.length ? state.locations : DEFAULT_LOCATIONS;
     const googleUrls = [];
+    const socialDomains = ['facebook.com', 'instagram.com', 'x.com'];
 
-    for (const location of locations.slice(0, 20)) {
-      for (const pattern of GOOGLE_QUERY_PATTERNS.slice(0, 20)) {
-        const query = `site:instagram.com "${location}" ${pattern}`;
-        googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
+    for (const domain of socialDomains) {
+      for (const location of locations.slice(0, 20)) {
+        for (const pattern of GOOGLE_QUERY_PATTERNS.slice(0, 20)) {
+          const query = `site:${domain} "${location}" ${pattern}`;
+          googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
+        }
       }
     }
-
-    const instagramUrls = INSTAGRAM_HASHTAGS.map((tag) => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`);
-    const facebookUrls = locations.slice(0, 30).map((location) => `https://www.facebook.com/search/posts/?q=${encodeURIComponent(`${location} trivia host`)}`);
-
-    return [...googleUrls, ...instagramUrls, ...facebookUrls];
+    return googleUrls;
   }
 
   function maybeRotateSearchPage() {
@@ -453,41 +477,57 @@
     URL.revokeObjectURL(url);
   }
 
-  function exportJson() {
-    const data = loadStoredPosts();
-    const filename = `sfm-export-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    saveBlob(JSON.stringify(data, null, 2), filename, 'application/json');
+  function formatResultTime(post) {
+    const basis = post.time || post.capturedAt;
+    const parsed = new Date(basis);
+    if (Number.isNaN(parsed.getTime())) return post.time || post.capturedAt || 'Unknown';
+    return parsed.toLocaleString();
   }
 
-  function toCsvValue(value) {
-    const safe = String(value ?? '').replace(/"/g, '""');
-    return `"${safe}"`;
-  }
-
-  function exportCsv() {
+  function exportLogPdf() {
     const data = loadStoredPosts();
-    const headers = ['id', 'platform', 'user', 'text', 'location', 'url', 'time', 'capturedAt', 'matchedKeywords', 'matchedLocations'];
-    const rows = [headers.join(',')];
+    const parts = [];
 
     for (const item of data) {
-      rows.push(
-        [
-          toCsvValue(item.id),
-          toCsvValue(item.platform),
-          toCsvValue(item.user),
-          toCsvValue(item.text),
-          toCsvValue(item.location),
-          toCsvValue(item.url),
-          toCsvValue(item.time),
-          toCsvValue(item.capturedAt),
-          toCsvValue((item.matchedKeywords || []).join('|')),
-          toCsvValue((item.matchedLocations || []).join('|'))
-        ].join(',')
+      const captured = new Date(item.capturedAt || Date.now());
+      const dateLabel = Number.isNaN(captured.getTime()) ? 'Unknown Date' : captured.toLocaleDateString();
+      const timeLabel = Number.isNaN(captured.getTime()) ? 'Unknown Time' : captured.toLocaleTimeString();
+      const platformLabel = item.platform === 'x' ? 'X' : item.platform.charAt(0).toUpperCase() + item.platform.slice(1);
+      parts.push(
+`RESULTS FROM ${dateLabel} AS OF ${timeLabel}
+- - - - - -
+Platform: ${platformLabel}
+Status: ${item.text || ''}
+Link: ${item.url || ''}
+Time: ${formatResultTime(item)}
+Keyword Match: ${(item.matchedKeywords || []).join(', ')}
+- - - - - -`
       );
     }
-
-    const filename = `sfm-export-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-    saveBlob(rows.join('\n'), filename, 'text/csv;charset=utf-8');
+    const fullText = parts.join('\n\n');
+    const escapedText = fullText.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/\r/g, '');
+    const contentStream = `BT /F1 10 Tf 40 780 Td 14 TL (${escapedText.replace(/\n/g, ') Tj T* (')}) Tj ET`;
+    const objects = [
+      '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+      '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+      '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
+      '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+      `5 0 obj << /Length ${contentStream.length} >> stream\n${contentStream}\nendstream endobj`
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+    for (const obj of objects) {
+      offsets.push(pdf.length);
+      pdf += `${obj}\n`;
+    }
+    const xrefStart = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    for (let i = 1; i < offsets.length; i += 1) {
+      pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+    }
+    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+    const filename = `sfm-log-${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
+    saveBlob(pdf, filename, 'application/pdf');
   }
 
   function statusLines() {
@@ -548,11 +588,10 @@
       <input id="sfm-interval" type="number" min="1" step="1" />
       <div class="sfm-actions">
         <button id="sfm-save" class="sfm-primary">Save settings</button>
-        <button id="sfm-half-hour">Use 30 minutes</button>
+        <button id="sfm-two-hours">Use 120 minutes</button>
         <button id="sfm-run-now">Run now</button>
         <button id="sfm-status-btn">Show status</button>
-        <button id="sfm-export-json">Export JSON</button>
-        <button id="sfm-export-csv">Export CSV</button>
+        <button id="sfm-export-pdf">Download Log as PDF</button>
         <button id="sfm-clear">Clear stored data</button>
         <button id="sfm-stop" class="sfm-danger">HARD STOP</button>
       </div>
@@ -613,9 +652,9 @@
       hydrate();
     });
 
-    panel.querySelector('#sfm-half-hour').addEventListener('click', () => {
+    panel.querySelector('#sfm-two-hours').addEventListener('click', () => {
       if (state.hardStopped) return;
-      interval.value = '30';
+      interval.value = '120';
     });
 
     panel.querySelector('#sfm-run-now').addEventListener('click', async () => {
@@ -628,8 +667,7 @@
       window.alert(statusLines().join('\n'));
       updateStatusText();
     });
-    panel.querySelector('#sfm-export-json').addEventListener('click', exportJson);
-    panel.querySelector('#sfm-export-csv').addEventListener('click', exportCsv);
+    panel.querySelector('#sfm-export-pdf').addEventListener('click', exportLogPdf);
     panel.querySelector('#sfm-clear').addEventListener('click', () => {
       if (!window.confirm('Delete all locally stored captured posts?')) return;
       GM_deleteValue(STORAGE_KEYS.data);
