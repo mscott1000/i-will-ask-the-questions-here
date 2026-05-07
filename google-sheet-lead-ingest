@@ -1,0 +1,233 @@
+const SHEET_ID = '1JKS5cHQrz-dK9Bb0hIqUQTpBQjXAnMe4J2JyGKibJSg';
+const SHEET_NAME = 'Generated Leads';
+
+const HEADERS = [
+  'Date Generated',
+  'Site',
+  'Text',
+  'Posted At',
+  'Link'
+];
+
+const DATE_GENERATED_FORMAT = 'MM/dd/yy HH:mm';
+
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents || '{}');
+
+    if (body.sheetId !== SHEET_ID) {
+      return jsonResponse({
+        ok: false,
+        error: 'Unauthorized'
+      });
+    }
+
+    const entries = Array.isArray(body.entries) ? body.entries : [];
+
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+
+    try {
+      ensureHeaderRow(sheet);
+
+      if (!entries.length) {
+        return jsonResponse({
+          ok: true,
+          received: 0,
+          inserted: 0,
+          skippedDuplicates: 0
+        });
+      }
+
+      const existingKeys = getExistingDedupeKeys(sheet);
+
+      const candidateRows = entries
+        .map(entry => normalizeEntryToRow(entry, body))
+        .filter(row => rowHasUsefulData(row));
+
+      const rowsToInsert = [];
+      let skippedDuplicates = 0;
+
+      for (const row of candidateRows) {
+        const key = makeDedupeKeyFromRow(row);
+
+        if (key && existingKeys.has(key)) {
+          skippedDuplicates += 1;
+          continue;
+        }
+
+        if (key) existingKeys.add(key);
+        rowsToInsert.push(row);
+      }
+
+      if (rowsToInsert.length) {
+        const startRow = sheet.getLastRow() + 1;
+        sheet.getRange(startRow, 1, rowsToInsert.length, HEADERS.length).setValues(rowsToInsert);
+      }
+
+      return jsonResponse({
+        ok: true,
+        received: entries.length,
+        inserted: rowsToInsert.length,
+        skippedDuplicates
+      });
+
+    } finally {
+      lock.releaseLock();
+    }
+
+  } catch (err) {
+    return jsonResponse({
+      ok: false,
+      error: String(err)
+    });
+  }
+}
+
+function normalizeEntryToRow(entry, body) {
+  return [
+    getDateGeneratedText(entry.dateGenerated || body.dateGenerated),
+    normalizeSite(entry.site || entry.platform || entry.source, entry.link || entry.url || entry.postUrl || entry.permalink),
+    cleanCellText(entry.text || entry.postText || entry.caption || entry.message || entry.content || entry.description || entry.fullText),
+    cleanCellText(entry.postedAt || entry.posted_at || entry.timestamp || entry.createdAt || entry.time),
+    cleanCellText(entry.link || entry.postUrl || entry.permalink || entry.url || entry.sourceUrl)
+  ];
+}
+
+function rowHasUsefulData(row) {
+  const site = row[1];
+  const text = row[2];
+  const link = row[4];
+
+  return Boolean(site || text || link);
+}
+
+function makeDedupeKeyFromRow(row) {
+  const site = cleanCellText(row[1]).toLowerCase();
+  const text = cleanCellText(row[2]).toLowerCase();
+  const postedAt = cleanCellText(row[3]).toLowerCase();
+  const link = normalizeLinkForDedupe(row[4]);
+
+  if (link) {
+    return `${site}|${link}`;
+  }
+
+  return `${site}|${postedAt}|${text.slice(0, 250)}`;
+}
+
+function getExistingDedupeKeys(sheet) {
+  const keys = new Set();
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) return keys;
+
+  const values = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+
+  for (const row of values) {
+    const key = makeDedupeKeyFromRow(row);
+    if (key) keys.add(key);
+  }
+
+  return keys;
+}
+
+function normalizeLinkForDedupe(value) {
+  const raw = cleanCellText(value);
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+
+    [
+      'fbclid',
+      'igsh',
+      'igshid',
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content'
+    ].forEach(param => url.searchParams.delete(param));
+
+    return url.href.replace(/\/$/, '').toLowerCase();
+  } catch (err) {
+    return raw.replace(/\/$/, '').toLowerCase();
+  }
+}
+
+function ensureHeaderRow(sheet) {
+  const lastColumn = sheet.getLastColumn();
+
+  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+
+  if (lastColumn > HEADERS.length) {
+    sheet.getRange(1, HEADERS.length + 1, 1, lastColumn - HEADERS.length).clearContent();
+  }
+}
+
+function getDateGeneratedText(value) {
+  const timezone = Session.getScriptTimeZone();
+
+  if (!value) {
+    return Utilities.formatDate(new Date(), timezone, DATE_GENERATED_FORMAT);
+  }
+
+  const trimmed = String(value).trim();
+
+  if (/^\d{2}\/\d{2}\/\d{2} \d{2}:\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const parsedDate = new Date(trimmed);
+
+  if (!isNaN(parsedDate.getTime())) {
+    return Utilities.formatDate(parsedDate, timezone, DATE_GENERATED_FORMAT);
+  }
+
+  return trimmed;
+}
+
+function normalizeSite(site, link) {
+  const rawSite = String(site || '').trim().toLowerCase();
+  const rawLink = String(link || '').trim().toLowerCase();
+  const combined = `${rawSite} ${rawLink}`;
+
+  if (combined.includes('instagram.com') || combined.includes('instagram')) {
+    return 'Instagram';
+  }
+
+  if (combined.includes('facebook.com') || combined.includes('facebook')) {
+    return 'Facebook';
+  }
+
+  if (
+    combined.includes('twitter.com') ||
+    combined.includes('x.com') ||
+    combined === 'x' ||
+    combined.includes('x/twitter')
+  ) {
+    return 'X/Twitter';
+  }
+
+  return '';
+}
+
+function cleanCellText(value) {
+  if (value === null || value === undefined) return '';
+
+  return String(value)
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
