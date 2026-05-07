@@ -1,10 +1,12 @@
 // ==UserScript==
-// @name         Social Feed Monitor (Lab)
+// @name         Socials Lead Generator
 // @namespace    http://tampermonkey.net/
 // @version      2.3.0
 // @description  Monitors social/search feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
+// @match        https://x.com/*
+// @match        https://twitter.com/*
 // @match        https://www.instagram.com/*
 // @match        https://www.facebook.com/*
 // @match        https://www.google.com/*
@@ -13,17 +15,253 @@
 // @grant        GM_deleteValue
 // @grant        GM_notification
 // @grant        GM_registerMenuCommand
+// @grant        GM_xmlhttpRequest
+// @connect      script.google.com
+// @connect      script.googleusercontent.com
 // ==/UserScript==
 
 (function () {
   'use strict';
+
+
+const LOCAL_POSTS_KEY = 'sfm_scraped_posts';
+const SENT_IDS_KEY = 'social_post_leads_sent_entry_ids_v1';
+
+const SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyaVJ09hXROkOuorUhb1ix1_2s4cpv2tfjt4Jbu52I7PL2S4GrBKdhd_yriSpM2LWXjyA/exec';
+const SHEETS_SHEET_ID = '1JKS5cHQrz-dK9Bb0hIqUQTpBQjXAnMe4J2JyGKibJSg';
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function formatDateGeneratedForSheet(date = new Date()) {
+  const month = pad2(date.getMonth() + 1);
+  const day = pad2(date.getDate());
+  const year = pad2(date.getFullYear() % 100);
+  const hour = pad2(date.getHours());
+  const minute = pad2(date.getMinutes());
+
+  return `${month}/${day}/${year} ${hour}:${minute}`;
+}
+
+function cleanPostText(value) {
+  if (value === null || value === undefined) return '';
+
+  return String(value)
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function collectMeaningfulPostText(entry) {
+  const possibleTextFields = [
+    entry.text,
+    entry.postText,
+    entry.caption,
+    entry.message,
+    entry.content,
+    entry.description,
+    entry.fullText,
+    entry.meaningfulText
+  ];
+
+  if (Array.isArray(entry.textParts)) {
+    possibleTextFields.push(...entry.textParts);
+  }
+
+  const seen = new Set();
+  const parts = [];
+
+  for (const value of possibleTextFields) {
+    const cleaned = cleanPostText(value);
+
+    if (!cleaned) continue;
+    if (seen.has(cleaned)) continue;
+
+    seen.add(cleaned);
+    parts.push(cleaned);
+  }
+
+  return parts.join('\n\n');
+}
+
+function normalizeSiteForSheet(site, link) {
+  const rawSite = String(site || '').trim().toLowerCase();
+  const rawLink = String(link || '').trim().toLowerCase();
+  const combined = `${rawSite} ${rawLink}`;
+
+  if (combined.includes('instagram.com') || combined.includes('instagram')) {
+    return 'Instagram';
+  }
+
+  if (combined.includes('facebook.com') || combined.includes('facebook')) {
+    return 'Facebook';
+  }
+
+  if (
+    combined.includes('twitter.com') ||
+    combined.includes('x.com') ||
+    combined === 'x' ||
+    combined.includes('x/twitter')
+  ) {
+    return 'X/Twitter';
+  }
+
+  return '';
+}
+
+function normalizeEntryForSheet(entry, dateGenerated) {
+  const link = cleanPostText(
+    entry.link ||
+    entry.postUrl ||
+    entry.permalink ||
+    entry.url ||
+    entry.sourceUrl ||
+    ''
+  );
+
+  const postedAt = cleanPostText(
+    entry.postedAt ||
+    entry.posted_at ||
+    entry.timestamp ||
+    entry.createdAt ||
+    entry.time ||
+    ''
+  );
+
+  const site = normalizeSiteForSheet(
+    entry.site ||
+    entry.platform ||
+    entry.source ||
+    '',
+    link
+  );
+
+  const text = collectMeaningfulPostText(entry);
+
+  return {
+    dateGenerated,
+    site,
+    text,
+    postedAt,
+    link
+  };
+}
+
+function makeEntryId(entry) {
+  const normalized = normalizeEntryForSheet(entry, '');
+
+  return [
+    normalized.site,
+    normalized.link,
+    normalized.postedAt,
+    normalized.text.slice(0, 250)
+  ].join('|');
+}
+
+function getPersistentLog() {
+  const log = GM_getValue(LOCAL_POSTS_KEY, []);
+
+  if (Array.isArray(log)) return log;
+
+  try {
+    return JSON.parse(log);
+  } catch (err) {
+    console.error('Could not parse persistent log:', err);
+    return [];
+  }
+}
+
+function setSentIds(sentIds) {
+  GM_setValue(SENT_IDS_KEY, Array.from(sentIds));
+}
+
+function getSentIds() {
+  return new Set(GM_getValue(SENT_IDS_KEY, []));
+}
+
+function getUnsentEntries() {
+  const log = getPersistentLog();
+  const sentIds = getSentIds();
+
+  return log
+    .map(entry => ({
+      id: makeEntryId(entry),
+      entry
+    }))
+    .filter(item => item.id && !sentIds.has(item.id));
+}
+
+function markEntriesSent(items) {
+  const sentIds = getSentIds();
+
+  for (const item of items) {
+    sentIds.add(item.id);
+  }
+
+  setSentIds(sentIds);
+}
+
+function sendUnsentLogEntriesToSheet() {
+  const unsentItems = getUnsentEntries();
+
+  if (!unsentItems.length) {
+    console.log('[Log Sender] No new entries to send.');
+    return;
+  }
+
+  const dateGenerated = formatDateGeneratedForSheet(new Date());
+
+  const payload = {
+    sheetId: SHEETS_SHEET_ID,
+    dateGenerated,
+    entries: unsentItems.map(item => normalizeEntryForSheet(item.entry, dateGenerated))
+  };
+
+  GM_xmlhttpRequest({
+    method: 'POST',
+    url: SHEETS_WEBAPP_URL,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    data: JSON.stringify(payload),
+    timeout: 60000,
+
+    onload: function(response) {
+      let result = null;
+
+      try {
+        result = JSON.parse(response.responseText || '{}');
+      } catch (err) {
+        console.error('[Log Sender] Bad response:', response.responseText);
+        return;
+      }
+
+      if (response.status >= 200 && response.status < 300 && result.ok) {
+        markEntriesSent(unsentItems);
+        console.log(`[Log Sender] Sent ${unsentItems.length} entries.`);
+      } else {
+        console.error('[Log Sender] Upload failed:', response.status, result);
+      }
+    },
+
+    onerror: function(err) {
+      console.error('[Log Sender] Network error:', err);
+    },
+
+    ontimeout: function() {
+      console.error('[Log Sender] Upload timed out.');
+    }
+  });
+}
 
   const LAST_UPDATED = '2026-04-28';
   const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
   const MIN_INTERVAL_MS = 60 * 1000;
 
   const STORAGE_KEYS = {
-    data: 'sfm_scraped_posts',
+    data: LOCAL_POSTS_KEY,
     keywords: 'sfm_keywords',
     locations: 'sfm_locations',
     checkInterval: 'sfm_check_interval_ms',
@@ -62,6 +300,14 @@
     '"open mic" "weekly event"', '"midweek event ideas"'
   ];
 
+  const INSTAGRAM_HASHTAGS = [
+    'stltrivia', 'stlouistrivia', 'trivianightstl', 'stlouisbar', 'stlbars', 'stlrestaurants', 'stlnightlife',
+    'stlevents', 'southcitystl', 'soulard', 'thegrovestl', 'towergrove', 'maplewoodmo', 'dogtownstl', 'centralwestend',
+    'stlhappyhour', 'stlfoodscene', 'stlbarlife', 'stlcommunity', 'stlbusiness', 'stlentertainment', 'stllocal',
+    'stcharlesmo', 'metroeast', 'stlouissmallbusiness', 'stlweekend', 'stlmidweek', 'stlpub', 'stlrestaurantscene',
+    'stlnightout', 'stlbeverages', 'stlvenue'
+  ];
+
   const DEFAULTS = {
     keywords: DEFAULT_KEYWORDS,
     locations: DEFAULT_LOCATIONS,
@@ -86,7 +332,7 @@
     locations: loadArray(STORAGE_KEYS.locations, DEFAULTS.locations).map(normalizeToken),
     checkInterval: loadNumber(STORAGE_KEYS.checkInterval, DEFAULTS.checkInterval),
     enabled: GM_getValue(STORAGE_KEYS.enabled, true),
-    autoRotateSearch: GM_getValue(STORAGE_KEYS.autoRotateSearch, false),
+    autoRotateSearch: GM_getValue(STORAGE_KEYS.autoRotateSearch, true),
     searchIndex: loadNumber(STORAGE_KEYS.searchIndex, 0),
     instagramFetchedUrls: new Set(),
     timer: null,
@@ -96,13 +342,15 @@
   };
 
   function detectPlatform() {
-    const host = window.location.hostname;
-    if (host.includes('x.com')) return 'x';
-    if (host.includes('instagram.com')) return 'instagram';
-    if (host.includes('facebook.com')) return 'facebook';
-    if (host.includes('google.com')) return 'google';
-    return 'unknown';
-  }
+  const host = window.location.hostname.toLowerCase();
+
+  if (host === 'x.com' || host === 'www.x.com' || host.includes('twitter.com')) return 'x';
+  if (host.includes('instagram.com')) return 'instagram';
+  if (host.includes('facebook.com')) return 'facebook';
+  if (host.includes('google.com')) return 'google';
+
+  return 'unknown';
+}
 
   function loadArray(key, fallback) {
     const value = GM_getValue(key, fallback);
@@ -145,22 +393,75 @@
     return Array.from(new Set(combined)).slice(0, DEFAULTS.maxPostsPerCheck);
   }
 
-  function derivePostId(element) {
-    const explicit =
-      element.getAttribute('data-post-id') ||
-      element.getAttribute('data-testid') ||
-      attrFrom(element, ['a[href*="/status/"]', 'a[href*="/posts/"]'], 'href');
+  function cleanUrlForStorage(href) {
+  if (!href) return '';
 
-    if (explicit) return String(explicit).trim();
+  try {
+    const url = new URL(href, window.location.origin);
+    url.hash = '';
 
-    const hashSource = `${element.innerText || ''}|${window.location.pathname}`;
-    let hash = 0;
-    for (let i = 0; i < hashSource.length; i += 1) {
-      hash = (hash << 5) - hash + hashSource.charCodeAt(i);
-      hash |= 0;
-    }
-    return `derived-${Math.abs(hash)}`;
+    [
+      'fbclid',
+      'igsh',
+      'igshid',
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content'
+    ].forEach(param => url.searchParams.delete(param));
+
+    return url.href;
+  } catch (err) {
+    return String(href || '').trim();
   }
+}
+
+function derivePostUrl(element) {
+  const selectors = [
+    'a[href*="/status/"]',
+    'a[href*="/posts/"]',
+    'a[href*="/permalink.php"]',
+    'a[href*="story_fbid="]',
+    'a[href*="/photos/"]',
+    'a[href*="/videos/"]',
+    'a[href*="/reel/"]',
+    'a[href*="/p/"]'
+  ];
+
+  for (const selector of selectors) {
+    const link = element.querySelector(selector);
+    const href = link?.getAttribute('href');
+
+    if (href) {
+      return cleanUrlForStorage(href);
+    }
+  }
+
+  return '';
+}
+
+function derivePostId(element) {
+  const postUrl = derivePostUrl(element);
+
+  const explicit =
+    postUrl ||
+    element.getAttribute('data-post-id') ||
+    element.getAttribute('data-testid') ||
+    attrFrom(element, ['a[href*="/status/"]', 'a[href*="/posts/"]'], 'href');
+
+  if (explicit) return String(explicit).trim();
+
+  const hashSource = `${element.innerText || ''}|${window.location.pathname}`;
+  let hash = 0;
+
+  for (let i = 0; i < hashSource.length; i += 1) {
+    hash = (hash << 5) - hash + hashSource.charCodeAt(i);
+    hash |= 0;
+  }
+
+  return `derived-${Math.abs(hash)}`;
+}
 
   function parseTime(element) {
     if (!element) return null;
@@ -170,36 +471,6 @@
   function matchesTokens(text, tokens) {
     const normalized = normalizeToken(text);
     return tokens.filter((token) => token && normalized.includes(token));
-  }
-
-  function inferPlatformFromUrl(url) {
-    const value = String(url || '').toLowerCase();
-    if (value.includes('facebook.com')) return 'facebook';
-    if (value.includes('instagram.com')) return 'instagram';
-    if (value.includes('x.com') || value.includes('twitter.com')) return 'x';
-    return 'google';
-  }
-
-  function parseRelativeTimeLabel(label, capturedAtIso) {
-    const text = String(label || '').trim().toLowerCase();
-    if (!text) return null;
-    const now = new Date(capturedAtIso);
-    if (Number.isNaN(now.getTime())) return null;
-    const match = text.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago/i);
-    if (!match) return null;
-    const amount = Number(match[1]);
-    const unit = match[2].toLowerCase();
-    const unitMs = {
-      second: 1000,
-      minute: 60 * 1000,
-      hour: 60 * 60 * 1000,
-      day: 24 * 60 * 60 * 1000,
-      week: 7 * 24 * 60 * 60 * 1000,
-      month: 30 * 24 * 60 * 60 * 1000,
-      year: 365 * 24 * 60 * 60 * 1000
-    }[unit];
-    if (!unitMs) return null;
-    return new Date(now.getTime() - (amount * unitMs)).toISOString();
   }
 
   function parseGoogleResult(element) {
@@ -213,54 +484,52 @@
     const matchedLocations = matchesTokens(text, state.locations);
     if (matchedKeywords.length === 0 || matchedLocations.length === 0) return null;
 
-    const capturedAt = new Date().toISOString();
-    const relativeTime = snippet.match(/(?:\b\d+\s*(?:second|minute|hour|day|week|month|year)s?\s+ago\b)/i)?.[0] || '';
-
     return {
       id: `${link}|${title}`.slice(0, 240),
-      platform: inferPlatformFromUrl(link),
+      platform: state.platform,
       user: 'google-result',
       text,
       location: null,
       url: link,
-      time: parseRelativeTimeLabel(relativeTime, capturedAt) || null,
-      capturedAt,
+      time: null,
+      capturedAt: new Date().toISOString(),
       matchedKeywords,
       matchedLocations
     };
   }
 
   function parsePost(element) {
-    if (state.platform === 'google') return parseGoogleResult(element);
+  if (state.platform === 'google') return parseGoogleResult(element);
 
-    const text = textFrom(element, SELECTOR_CONFIG.text);
-    const user = textFrom(element, SELECTOR_CONFIG.user) || attrFrom(element, SELECTOR_CONFIG.user, 'data-author') || 'unknown';
-    const location = textFrom(element, SELECTOR_CONFIG.location);
-    const postTime = parseTime(firstMatch(element, SELECTOR_CONFIG.time));
-    const id = derivePostId(element);
+  const text = textFrom(element, SELECTOR_CONFIG.text);
+  const user = textFrom(element, SELECTOR_CONFIG.user) || attrFrom(element, SELECTOR_CONFIG.user, 'data-author') || 'unknown';
+  const location = textFrom(element, SELECTOR_CONFIG.location);
+  const postTime = parseTime(firstMatch(element, SELECTOR_CONFIG.time));
+  const postUrl = derivePostUrl(element) || window.location.href;
+  const id = derivePostId(element);
 
-    if (!text) return null;
+  if (!text) return null;
 
-    const matchedKeywords = matchesTokens(text, state.keywords.map(normalizeToken));
-    const matchedLocations = matchesTokens(`${location} ${text}`, state.locations);
+  const matchedKeywords = matchesTokens(text, state.keywords.map(normalizeToken));
+  const matchedLocations = matchesTokens(`${location} ${text}`, state.locations);
 
-    if (matchedKeywords.length === 0 || matchedLocations.length === 0) {
-      return null;
-    }
-
-    return {
-      id,
-      platform: state.platform,
-      user,
-      text,
-      location: location || null,
-      url: window.location.href,
-      time: postTime,
-      capturedAt: new Date().toISOString(),
-      matchedKeywords,
-      matchedLocations
-    };
+  if (matchedKeywords.length === 0 || matchedLocations.length === 0) {
+    return null;
   }
+
+  return {
+    id,
+    platform: state.platform,
+    user,
+    text,
+    location: location || null,
+    url: postUrl,
+    time: postTime,
+    capturedAt: new Date().toISOString(),
+    matchedKeywords,
+    matchedLocations
+  };
+}
 
   function deriveLocationFromPathname() {
     const match = window.location.pathname.match(/\/explore\/locations\/\d+\/([^/]+)\//i);
@@ -356,44 +625,103 @@
     GM_setValue(STORAGE_KEYS.data, posts);
   }
 
-  function appendWithDedupe(newPosts) {
-    if (!newPosts.length) return 0;
+  function canonicalPostKey(post) {
+  const normalized = normalizeEntryForSheet(post, '');
+  const site = normalized.site || post.platform || '';
+  const link = cleanPostText(normalized.link).replace(/\/$/, '').toLowerCase();
 
-    const existing = loadStoredPosts();
-    const seen = new Set(existing.map((p) => `${p.platform}:${p.id}`));
-    let added = 0;
-
-    for (const post of newPosts) {
-      const key = `${post.platform}:${post.id}`;
-      if (!seen.has(key)) {
-        existing.push(post);
-        seen.add(key);
-        added += 1;
-      }
-    }
-
-    if (added > 0) {
-      saveStoredPosts(existing);
-    }
-
-    return added;
+  if (link) {
+    return `${site}|${link}`;
   }
 
-  function buildSearchUrls() {
-    const locations = state.locations.length ? state.locations : DEFAULT_LOCATIONS;
-    const googleUrls = [];
-    const socialDomains = ['facebook.com', 'instagram.com', 'x.com'];
+  return [
+    site,
+    post.id || '',
+    normalized.postedAt || '',
+    normalized.text.slice(0, 250)
+  ].join('|').toLowerCase();
+}
 
-    for (const domain of socialDomains) {
-      for (const location of locations.slice(0, 20)) {
-        for (const pattern of GOOGLE_QUERY_PATTERNS.slice(0, 20)) {
-          const query = `site:${domain} "${location}" ${pattern}`;
-          googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
-        }
+function appendWithDedupe(newPosts) {
+  if (!newPosts.length) return 0;
+
+  const existing = loadStoredPosts();
+  const seen = new Set(existing.map(canonicalPostKey));
+  let added = 0;
+
+  for (const post of newPosts) {
+    const key = canonicalPostKey(post);
+
+    if (!key || seen.has(key)) continue;
+
+    existing.push(post);
+    seen.add(key);
+    added += 1;
+  }
+
+  if (added > 0) {
+    saveStoredPosts(existing);
+  }
+
+  return added;
+}
+
+  function stripQuotes(value) {
+  return String(value || '').replace(/"/g, '').trim();
+}
+
+function buildSearchUrls() {
+  const locations = state.locations.length ? state.locations : DEFAULT_LOCATIONS;
+  const googleUrls = [];
+
+  const googleDomains = [
+    'instagram.com',
+    'facebook.com',
+    'x.com',
+    'twitter.com'
+  ];
+
+  const locationSlice = locations.slice(0, 12);
+  const patternSlice = GOOGLE_QUERY_PATTERNS.slice(0, 12);
+
+  for (const domain of googleDomains) {
+    for (const location of locationSlice) {
+      for (const pattern of patternSlice) {
+        const query = `site:${domain} "${location}" ${pattern}`;
+        googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
       }
     }
-    return googleUrls;
   }
+
+  const instagramUrls = INSTAGRAM_HASHTAGS
+    .slice(0, 30)
+    .map(tag => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`);
+
+  const facebookUrls = [];
+
+  for (const location of locations.slice(0, 20)) {
+    for (const pattern of GOOGLE_QUERY_PATTERNS.slice(0, 5)) {
+      const query = `${location} ${stripQuotes(pattern)}`;
+      facebookUrls.push(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`);
+    }
+  }
+
+  const xUrls = [];
+
+  for (const location of locations.slice(0, 20)) {
+    for (const pattern of GOOGLE_QUERY_PATTERNS.slice(0, 5)) {
+      const query = `${location} ${stripQuotes(pattern)}`;
+      xUrls.push(`https://x.com/search?q=${encodeURIComponent(query)}&src=typed_query&f=live`);
+    }
+  }
+
+  return [
+    ...googleUrls,
+    ...instagramUrls,
+    ...facebookUrls,
+    ...xUrls
+  ];
+}
 
   function maybeRotateSearchPage() {
     if (state.hardStopped || !state.autoRotateSearch) return;
@@ -412,27 +740,37 @@
   }
 
   async function scrapeOnce() {
-    if (!state.enabled || state.hardStopped) return;
+  if (!state.enabled || state.hardStopped) return;
 
-    state.activeFetchController = new AbortController();
+  state.activeFetchController = new AbortController();
 
-    try {
-      const parsed = allPosts().map(parsePost).filter(Boolean);
-      const instagramLocationMatches = await scrapeInstagramLocationPage();
-      parsed.push(...instagramLocationMatches);
-      if (state.hardStopped) return;
-      const added = appendWithDedupe(parsed);
+  try {
+    const parsed = allPosts().map(parsePost).filter(Boolean);
+    const instagramLocationMatches = await scrapeInstagramLocationPage();
 
-      if (added > 0) {
-        console.log(`[SFM] Added ${added} post(s). Total stored: ${loadStoredPosts().length}`);
-        GM_notification({ title: 'Social Feed Monitor', text: `Captured ${added} new matching post(s).`, timeout: 2000 });
-      }
+    parsed.push(...instagramLocationMatches);
 
-      maybeRotateSearchPage();
-    } finally {
-      state.activeFetchController = null;
+    if (state.hardStopped) return;
+
+    const added = appendWithDedupe(parsed);
+
+    if (added > 0) {
+      console.log(`[SFM] Added ${added} post(s). Total stored: ${loadStoredPosts().length}`);
+      GM_notification({
+        title: 'Social Feed Monitor',
+        text: `Captured ${added} new matching post(s).`,
+        timeout: 2000
+      });
     }
+
+    sendUnsentLogEntriesToSheet();
+
+    maybeRotateSearchPage();
+
+  } finally {
+    state.activeFetchController = null;
   }
+}
 
   function startMonitor() {
     if (state.hardStopped) return;
@@ -477,57 +815,41 @@
     URL.revokeObjectURL(url);
   }
 
-  function formatResultTime(post) {
-    const basis = post.time || post.capturedAt;
-    const parsed = new Date(basis);
-    if (Number.isNaN(parsed.getTime())) return post.time || post.capturedAt || 'Unknown';
-    return parsed.toLocaleString();
+  function exportJson() {
+    const data = loadStoredPosts();
+    const filename = `sfm-export-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    saveBlob(JSON.stringify(data, null, 2), filename, 'application/json');
   }
 
-  function exportLogPdf() {
+  function toCsvValue(value) {
+    const safe = String(value ?? '').replace(/"/g, '""');
+    return `"${safe}"`;
+  }
+
+  function exportCsv() {
     const data = loadStoredPosts();
-    const parts = [];
+    const headers = ['id', 'platform', 'user', 'text', 'location', 'url', 'time', 'capturedAt', 'matchedKeywords', 'matchedLocations'];
+    const rows = [headers.join(',')];
 
     for (const item of data) {
-      const captured = new Date(item.capturedAt || Date.now());
-      const dateLabel = Number.isNaN(captured.getTime()) ? 'Unknown Date' : captured.toLocaleDateString();
-      const timeLabel = Number.isNaN(captured.getTime()) ? 'Unknown Time' : captured.toLocaleTimeString();
-      const platformLabel = item.platform === 'x' ? 'X' : item.platform.charAt(0).toUpperCase() + item.platform.slice(1);
-      parts.push(
-`RESULTS FROM ${dateLabel} AS OF ${timeLabel}
-- - - - - -
-Platform: ${platformLabel}
-Status: ${item.text || ''}
-Link: ${item.url || ''}
-Time: ${formatResultTime(item)}
-Keyword Match: ${(item.matchedKeywords || []).join(', ')}
-- - - - - -`
+      rows.push(
+        [
+          toCsvValue(item.id),
+          toCsvValue(item.platform),
+          toCsvValue(item.user),
+          toCsvValue(item.text),
+          toCsvValue(item.location),
+          toCsvValue(item.url),
+          toCsvValue(item.time),
+          toCsvValue(item.capturedAt),
+          toCsvValue((item.matchedKeywords || []).join('|')),
+          toCsvValue((item.matchedLocations || []).join('|'))
+        ].join(',')
       );
     }
-    const fullText = parts.join('\n\n');
-    const escapedText = fullText.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/\r/g, '');
-    const contentStream = `BT /F1 10 Tf 40 780 Td 14 TL (${escapedText.replace(/\n/g, ') Tj T* (')}) Tj ET`;
-    const objects = [
-      '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
-      '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-      '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
-      '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
-      `5 0 obj << /Length ${contentStream.length} >> stream\n${contentStream}\nendstream endobj`
-    ];
-    let pdf = '%PDF-1.4\n';
-    const offsets = [0];
-    for (const obj of objects) {
-      offsets.push(pdf.length);
-      pdf += `${obj}\n`;
-    }
-    const xrefStart = pdf.length;
-    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-    for (let i = 1; i < offsets.length; i += 1) {
-      pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
-    }
-    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-    const filename = `sfm-log-${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`;
-    saveBlob(pdf, filename, 'application/pdf');
+
+    const filename = `sfm-export-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+    saveBlob(rows.join('\n'), filename, 'text/csv;charset=utf-8');
   }
 
   function statusLines() {
@@ -588,10 +910,11 @@ Keyword Match: ${(item.matchedKeywords || []).join(', ')}
       <input id="sfm-interval" type="number" min="1" step="1" />
       <div class="sfm-actions">
         <button id="sfm-save" class="sfm-primary">Save settings</button>
-        <button id="sfm-two-hours">Use 120 minutes</button>
+        <button id="sfm-half-hour">Use 30 minutes</button>
         <button id="sfm-run-now">Run now</button>
         <button id="sfm-status-btn">Show status</button>
-        <button id="sfm-export-pdf">Download Log as PDF</button>
+        <button id="sfm-export-json">Export JSON</button>
+        <button id="sfm-export-csv">Export CSV</button>
         <button id="sfm-clear">Clear stored data</button>
         <button id="sfm-stop" class="sfm-danger">HARD STOP</button>
       </div>
@@ -652,9 +975,9 @@ Keyword Match: ${(item.matchedKeywords || []).join(', ')}
       hydrate();
     });
 
-    panel.querySelector('#sfm-two-hours').addEventListener('click', () => {
+    panel.querySelector('#sfm-half-hour').addEventListener('click', () => {
       if (state.hardStopped) return;
-      interval.value = '120';
+      interval.value = '30';
     });
 
     panel.querySelector('#sfm-run-now').addEventListener('click', async () => {
@@ -667,7 +990,8 @@ Keyword Match: ${(item.matchedKeywords || []).join(', ')}
       window.alert(statusLines().join('\n'));
       updateStatusText();
     });
-    panel.querySelector('#sfm-export-pdf').addEventListener('click', exportLogPdf);
+    panel.querySelector('#sfm-export-json').addEventListener('click', exportJson);
+    panel.querySelector('#sfm-export-csv').addEventListener('click', exportCsv);
     panel.querySelector('#sfm-clear').addEventListener('click', () => {
       if (!window.confirm('Delete all locally stored captured posts?')) return;
       GM_deleteValue(STORAGE_KEYS.data);
