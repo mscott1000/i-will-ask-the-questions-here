@@ -4,9 +4,10 @@ This document is the source of truth for the new direction of the project.
 
 ## Direction summary
 
-1. **No required backend/server by default**
+1. **Tampermonkey-first, with optional Sheets ingest**
    - Use Tampermonkey storage for persistence.
-   - Export manually to JSON or CSV as needed.
+   - Support manual export to JSON/CSV.
+   - Support optional automatic upload of unsent entries to a Google Apps Script web app.
 
 2. **Delete unused/duplicate initialization paths**
    - Keep one clear startup routine.
@@ -23,11 +24,16 @@ This document is the source of truth for the new direction of the project.
 
 5. **Lab-safe operation model**
    - Operate only on approved fake social platforms.
-   - Keep all scraped data local unless user explicitly exports.
+   - Keep scraped data local by default; only send remote when the sheet endpoint configuration is intentionally enabled.
+
+6. **Lead pipeline interoperability**
+   - Keep userscript-side normalization aligned with the Apps Script ingest contract.
+   - Preserve the checked-in Google Apps Script file (`google-sheet-lead-ingest`) as the current import implementation used by Google Sheets.
 
 ## Implementation requirements for future updates
 
 - Continue using storage-first architecture.
 - Keep selector logic configurable and easy to update.
 - Preserve paste-ready userscript in `tampermonkey/social-feed-monitor.user.js`.
+- Keep docs and ingest contract synchronized with fields emitted by `normalizeEntryForSheet` in the userscript.
 - Keep user prompts simple for non-developer operators.
