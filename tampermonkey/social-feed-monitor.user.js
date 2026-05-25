@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Socials Lead Generator
 // @namespace    http://tampermonkey.net/
-// @version      2.3.0
+// @version      2.4.0
 // @description  Monitors social/search feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
@@ -670,8 +670,9 @@ function appendWithDedupe(newPosts) {
   return String(value || '').replace(/"/g, '').trim();
 }
 
-function buildSearchUrls() {
-  const locations = state.locations.length ? state.locations : DEFAULT_LOCATIONS;
+  function buildSearchUrls() {
+  const areas = state.locations.length ? state.locations : DEFAULT_LOCATIONS;
+  const terms = state.keywords.length ? state.keywords : DEFAULT_KEYWORDS;
   const googleUrls = [];
 
   const googleDomains = [
@@ -681,36 +682,41 @@ function buildSearchUrls() {
     'twitter.com'
   ];
 
-  const locationSlice = locations.slice(0, 12);
-  const patternSlice = GOOGLE_QUERY_PATTERNS.slice(0, 12);
+  const areaSlice = areas.slice(0, 20);
+  const termSlice = terms.slice(0, 20);
 
   for (const domain of googleDomains) {
-    for (const location of locationSlice) {
-      for (const pattern of patternSlice) {
-        const query = `site:${domain} "${location}" ${pattern}`;
+    for (const area of areaSlice) {
+      for (const term of termSlice) {
+        const query = `site:${domain} "${area}" "${term}"`;
         googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
       }
     }
   }
 
-  const instagramUrls = INSTAGRAM_HASHTAGS
-    .slice(0, 30)
+  const instagramTags = Array.from(new Set([
+    ...INSTAGRAM_HASHTAGS,
+    ...areas.map(area => area.replace(/[^a-z0-9]/gi, ''))
+  ].filter(Boolean)));
+
+  const instagramUrls = instagramTags
+    .slice(0, 40)
     .map(tag => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`);
 
   const facebookUrls = [];
 
-  for (const location of locations.slice(0, 20)) {
-    for (const pattern of GOOGLE_QUERY_PATTERNS.slice(0, 5)) {
-      const query = `${location} ${stripQuotes(pattern)}`;
+  for (const area of areaSlice) {
+    for (const term of termSlice) {
+      const query = `${area} ${term}`;
       facebookUrls.push(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`);
     }
   }
 
   const xUrls = [];
 
-  for (const location of locations.slice(0, 20)) {
-    for (const pattern of GOOGLE_QUERY_PATTERNS.slice(0, 5)) {
-      const query = `${location} ${stripQuotes(pattern)}`;
+  for (const area of areaSlice) {
+    for (const term of termSlice) {
+      const query = `${area} ${term}`;
       xUrls.push(`https://x.com/search?q=${encodeURIComponent(query)}&src=typed_query&f=live`);
     }
   }
@@ -859,8 +865,8 @@ function buildSearchUrls() {
       `Enabled: ${state.enabled ? 'Yes' : 'No'}`,
       `Hard stopped: ${state.hardStopped ? 'Yes' : 'No'}`,
       `Stored posts: ${count}`,
-      `Keywords: ${state.keywords.join(', ') || '(none)'}`,
-      `Locations: ${state.locations.join(', ') || '(none)'}`,
+      `Search terms: ${state.keywords.join(', ') || '(none)'}`,
+      `Areas: ${state.locations.join(', ') || '(none)'}`,
       `Check interval: ${Math.round(state.checkInterval / 60000)} minute(s)`,
       `Auto-rotate search pages: ${state.autoRotateSearch ? 'On' : 'Off'}`,
       `Last updated: ${LAST_UPDATED}`
@@ -902,9 +908,9 @@ function buildSearchUrls() {
       <h3>Social Feed Monitor</h3>
       <div class="sfm-row"><input id="sfm-enabled" type="checkbox" /><label for="sfm-enabled" style="margin:0">Enable monitor</label></div>
       <div class="sfm-row"><input id="sfm-auto-rotate" type="checkbox" /><label for="sfm-auto-rotate" style="margin:0">Auto-rotate search pages each cycle</label></div>
-      <label for="sfm-keywords">Keywords (comma or new line)</label>
+      <label for="sfm-keywords">Search terms list (comma or new line)</label>
       <textarea id="sfm-keywords"></textarea>
-      <label for="sfm-locations">Locations (comma or new line)</label>
+      <label for="sfm-locations">Areas list (comma or new line)</label>
       <textarea id="sfm-locations"></textarea>
       <label for="sfm-interval">Automatic check interval (minutes)</label>
       <input id="sfm-interval" type="number" min="1" step="1" />
