@@ -1,0 +1,91 @@
+name: Sync shared files to platform repos
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "shared/**"
+      - "platform_specs/**"
+      - ".github/workflows/sync-platform-repos.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - repo: mscott1000/Facebook-Scraper
+            branch: main
+            platform_spec: facebook.yaml
+
+          - repo: mscott1000/instaloader
+            branch: master
+            platform_spec: instagram.yaml
+
+          - repo: mscott1000/Scweet
+            branch: master
+            platform_spec: x.yaml
+
+    steps:
+      - name: Check out main repo
+        uses: actions/checkout@v4
+        with:
+          path: main-repo
+
+      - name: Check out target platform repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repo }}
+          token: ${{ secrets.CROSS_REPO_SYNC_TOKEN }}
+          ref: ${{ matrix.branch }}
+          path: target-repo
+
+      - name: Copy shared files into platform repo
+        run: |
+          rm -rf target-repo/shared
+          mkdir -p target-repo/shared
+          cp -R main-repo/shared/. target-repo/shared/
+
+          mkdir -p target-repo/platform_specs
+          cp main-repo/platform_specs/${{ matrix.platform_spec }} target-repo/platform_specs/platform.yaml
+
+      - name: Create update branch
+        working-directory: target-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH_NAME="sync-shared-from-main-${GITHUB_SHA::7}"
+
+          git checkout -b "$BRANCH_NAME"
+
+          if git diff --quiet; then
+            echo "No changes to sync."
+            echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
+          else
+            git add shared platform_specs/platform.yaml
+            git commit -m "Sync shared files from main repo"
+            git push origin "$BRANCH_NAME"
+            echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
+            echo "BRANCH_NAME=$BRANCH_NAME" >> "$GITHUB_ENV"
+          fi
+
+      - name: Open pull request
+        if: env.HAS_CHANGES == 'true'
+        working-directory: target-repo
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_SYNC_TOKEN }}
+        run: |
+          gh pr create \
+            --repo "${{ matrix.repo }}" \
+            --base "${{ matrix.branch }}" \
+            --head "$BRANCH_NAME" \
+            --title "Sync shared files from main repo" \
+            --body "Automated PR created from changes in mscott1000/i-will-ask-the-questions-here."
