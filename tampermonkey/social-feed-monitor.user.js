@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Socials Lead Generator
 // @namespace    http://tampermonkey.net/
-// @version      2.4.0
+// @version      2.4.1
 // @description  Monitors social/search feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
@@ -893,7 +893,6 @@ function filterIncongruentLocations(posts) {
 
     const panel = document.createElement('div');
     panel.id = 'sfm-panel';
-    panel.classList.add('sfm-hidden');
     panel.innerHTML = `
       <h3>Social Feed Monitor</h3>
       <label for="sfm-keywords">Search terms list (comma or new line)</label>
@@ -920,10 +919,12 @@ function filterIncongruentLocations(posts) {
 
     state.ui = { panel, keywords, locations, interval, status };
 
-    function hydrate() {
-      keywords.value = state.keywords.join(', ');
-      locations.value = state.locations.join(', ');
-      interval.value = String(Math.max(1, Math.round(state.checkInterval / 60000)));
+    function hydrate({ preserveInputs = true } = {}) {
+      if (!preserveInputs) {
+        keywords.value = state.keywords.join(', ');
+        locations.value = state.locations.join(', ');
+        interval.value = String(Math.max(1, Math.round(state.checkInterval / 60000)));
+      }
       const controls = [keywords, locations, interval];
       controls.forEach((el) => {
         el.disabled = state.hardStopped;
@@ -933,7 +934,9 @@ function filterIncongruentLocations(posts) {
 
     toggle.addEventListener('click', () => {
       panel.classList.toggle('sfm-hidden');
-      hydrate();
+      if (!panel.classList.contains('sfm-hidden')) {
+        hydrate({ preserveInputs: false });
+      }
     });
 
     panel.querySelector('#sfm-start').addEventListener('click', () => {
@@ -956,7 +959,7 @@ function filterIncongruentLocations(posts) {
       GM_setValue(STORAGE_KEYS.checkInterval, state.checkInterval);
       startMonitor();
       GM_notification({ title: 'Social Feed Monitor', text: `Search run started. Checking every ${Math.round(state.checkInterval / 60000)} minute(s).` });
-      hydrate();
+      hydrate({ preserveInputs: false });
     });
 
     panel.querySelector('#sfm-debug').addEventListener('click', () => {
@@ -984,15 +987,15 @@ function filterIncongruentLocations(posts) {
     panel.querySelector('#sfm-stop').addEventListener('click', () => {
       if (!window.confirm('Hard stop now? This immediately halts all monitor activity until the page is reloaded.')) return;
       hardStopMonitor();
-      hydrate();
+      hydrate({ preserveInputs: false });
     });
 
     GM_registerMenuCommand('Open Social Feed Monitor Panel', () => {
       panel.classList.remove('sfm-hidden');
-      hydrate();
+      hydrate({ preserveInputs: false });
     });
 
-    hydrate();
+    hydrate({ preserveInputs: false });
   }
 
   function initialize() {
