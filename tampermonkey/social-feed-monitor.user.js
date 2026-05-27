@@ -331,8 +331,8 @@ function sendUnsentLogEntriesToSheet() {
     keywords: loadArray(STORAGE_KEYS.keywords, DEFAULTS.keywords),
     locations: loadArray(STORAGE_KEYS.locations, DEFAULTS.locations).map(normalizeToken),
     checkInterval: loadNumber(STORAGE_KEYS.checkInterval, DEFAULTS.checkInterval),
-    enabled: GM_getValue(STORAGE_KEYS.enabled, true),
-    autoRotateSearch: GM_getValue(STORAGE_KEYS.autoRotateSearch, true),
+    enabled: true,
+    autoRotateSearch: true,
     searchIndex: loadNumber(STORAGE_KEYS.searchIndex, 0),
     instagramFetchedUrls: new Set(),
     timer: null,
@@ -809,55 +809,6 @@ function appendWithDedupe(newPosts) {
       .filter(Boolean);
   }
 
-  function saveBlob(content, filename, mime) {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function exportJson() {
-    const data = loadStoredPosts();
-    const filename = `sfm-export-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    saveBlob(JSON.stringify(data, null, 2), filename, 'application/json');
-  }
-
-  function toCsvValue(value) {
-    const safe = String(value ?? '').replace(/"/g, '""');
-    return `"${safe}"`;
-  }
-
-  function exportCsv() {
-    const data = loadStoredPosts();
-    const headers = ['id', 'platform', 'user', 'text', 'location', 'url', 'time', 'capturedAt', 'matchedKeywords', 'matchedLocations'];
-    const rows = [headers.join(',')];
-
-    for (const item of data) {
-      rows.push(
-        [
-          toCsvValue(item.id),
-          toCsvValue(item.platform),
-          toCsvValue(item.user),
-          toCsvValue(item.text),
-          toCsvValue(item.location),
-          toCsvValue(item.url),
-          toCsvValue(item.time),
-          toCsvValue(item.capturedAt),
-          toCsvValue((item.matchedKeywords || []).join('|')),
-          toCsvValue((item.matchedLocations || []).join('|'))
-        ].join(',')
-      );
-    }
-
-    const filename = `sfm-export-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-    saveBlob(rows.join('\n'), filename, 'text/csv;charset=utf-8');
-  }
-
   function statusLines() {
     const count = loadStoredPosts().length;
     return [
@@ -906,8 +857,6 @@ function appendWithDedupe(newPosts) {
     panel.classList.add('sfm-hidden');
     panel.innerHTML = `
       <h3>Social Feed Monitor</h3>
-      <div class="sfm-row"><input id="sfm-enabled" type="checkbox" /><label for="sfm-enabled" style="margin:0">Enable monitor</label></div>
-      <div class="sfm-row"><input id="sfm-auto-rotate" type="checkbox" /><label for="sfm-auto-rotate" style="margin:0">Auto-rotate search pages each cycle</label></div>
       <label for="sfm-keywords">Search terms list (comma or new line)</label>
       <textarea id="sfm-keywords"></textarea>
       <label for="sfm-locations">Areas list (comma or new line)</label>
@@ -917,10 +866,6 @@ function appendWithDedupe(newPosts) {
       <div class="sfm-actions">
         <button id="sfm-save" class="sfm-primary">Save settings</button>
         <button id="sfm-half-hour">Use 30 minutes</button>
-        <button id="sfm-run-now">Run now</button>
-        <button id="sfm-status-btn">Show status</button>
-        <button id="sfm-export-json">Export JSON</button>
-        <button id="sfm-export-csv">Export CSV</button>
         <button id="sfm-clear">Clear stored data</button>
         <button id="sfm-stop" class="sfm-danger">HARD STOP</button>
       </div>
@@ -929,22 +874,18 @@ function appendWithDedupe(newPosts) {
     document.body.appendChild(toggle);
     document.body.appendChild(panel);
 
-    const enabled = panel.querySelector('#sfm-enabled');
-    const autoRotate = panel.querySelector('#sfm-auto-rotate');
     const keywords = panel.querySelector('#sfm-keywords');
     const locations = panel.querySelector('#sfm-locations');
     const interval = panel.querySelector('#sfm-interval');
     const status = panel.querySelector('#sfm-status');
 
-    state.ui = { panel, enabled, autoRotate, keywords, locations, interval, status };
+    state.ui = { panel, keywords, locations, interval, status };
 
     function hydrate() {
-      enabled.checked = state.enabled;
-      autoRotate.checked = state.autoRotateSearch;
       keywords.value = state.keywords.join(', ');
       locations.value = state.locations.join(', ');
       interval.value = String(Math.max(1, Math.round(state.checkInterval / 60000)));
-      const controls = [enabled, autoRotate, keywords, locations, interval];
+      const controls = [keywords, locations, interval];
       controls.forEach((el) => {
         el.disabled = state.hardStopped;
       });
@@ -966,13 +907,11 @@ function appendWithDedupe(newPosts) {
         return;
       }
 
-      state.enabled = enabled.checked;
-      state.autoRotateSearch = autoRotate.checked;
       state.keywords = newKeywords;
       state.locations = newLocations;
       state.checkInterval = Math.max(MIN_INTERVAL_MS, Math.round(minutes * 60000));
-      GM_setValue(STORAGE_KEYS.enabled, state.enabled);
-      GM_setValue(STORAGE_KEYS.autoRotateSearch, state.autoRotateSearch);
+      GM_setValue(STORAGE_KEYS.enabled, true);
+      GM_setValue(STORAGE_KEYS.autoRotateSearch, true);
       GM_setValue(STORAGE_KEYS.keywords, newKeywords);
       GM_setValue(STORAGE_KEYS.locations, newLocations);
       GM_setValue(STORAGE_KEYS.checkInterval, state.checkInterval);
@@ -986,18 +925,6 @@ function appendWithDedupe(newPosts) {
       interval.value = '30';
     });
 
-    panel.querySelector('#sfm-run-now').addEventListener('click', async () => {
-      if (state.hardStopped) return;
-      await scrapeOnce();
-      updateStatusText();
-    });
-
-    panel.querySelector('#sfm-status-btn').addEventListener('click', () => {
-      window.alert(statusLines().join('\n'));
-      updateStatusText();
-    });
-    panel.querySelector('#sfm-export-json').addEventListener('click', exportJson);
-    panel.querySelector('#sfm-export-csv').addEventListener('click', exportCsv);
     panel.querySelector('#sfm-clear').addEventListener('click', () => {
       if (!window.confirm('Delete all locally stored captured posts?')) return;
       GM_deleteValue(STORAGE_KEYS.data);
