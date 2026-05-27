@@ -331,8 +331,8 @@ function sendUnsentLogEntriesToSheet() {
     keywords: loadArray(STORAGE_KEYS.keywords, DEFAULTS.keywords),
     locations: loadArray(STORAGE_KEYS.locations, DEFAULTS.locations).map(normalizeToken),
     checkInterval: loadNumber(STORAGE_KEYS.checkInterval, DEFAULTS.checkInterval),
-    enabled: true,
-    autoRotateSearch: true,
+    enabled: loadBoolean(STORAGE_KEYS.enabled, true),
+    autoRotateSearch: loadBoolean(STORAGE_KEYS.autoRotateSearch, true),
     searchIndex: loadNumber(STORAGE_KEYS.searchIndex, 0),
     instagramFetchedUrls: new Set(),
     timer: null,
@@ -355,6 +355,11 @@ function sendUnsentLogEntriesToSheet() {
   function loadArray(key, fallback) {
     const value = GM_getValue(key, fallback);
     return Array.isArray(value) ? value : fallback;
+  }
+
+  function loadBoolean(key, fallback) {
+    const value = GM_getValue(key, fallback);
+    return typeof value === 'boolean' ? value : fallback;
   }
 
   function loadNumber(key, fallback) {
@@ -666,6 +671,34 @@ function appendWithDedupe(newPosts) {
   return added;
 }
 
+
+function locationsCongruent(post) {
+  if (!state.locations.length) return true;
+
+  const associatedLocation = normalizeToken(post.location || '');
+
+  if (!associatedLocation) return true;
+
+  return state.locations.some((loc) => associatedLocation.includes(loc) || loc.includes(associatedLocation));
+}
+
+function filterIncongruentLocations(posts) {
+  if (!posts.length) return { kept: posts, dropped: 0 };
+
+  const kept = [];
+  let dropped = 0;
+
+  for (const post of posts) {
+    if (locationsCongruent(post)) {
+      kept.push(post);
+    } else {
+      dropped += 1;
+    }
+  }
+
+  return { kept, dropped };
+}
+
   function stripQuotes(value) {
   return String(value || '').replace(/"/g, '').trim();
 }
@@ -758,7 +791,13 @@ function appendWithDedupe(newPosts) {
 
     if (state.hardStopped) return;
 
-    const added = appendWithDedupe(parsed);
+    const { kept: congruentPosts, dropped } = filterIncongruentLocations(parsed);
+
+    if (dropped > 0) {
+      console.log(`[SFM] Dropped ${dropped} post(s) due to incongruent associated locations.`);
+    }
+
+    const added = appendWithDedupe(congruentPosts);
 
     if (added > 0) {
       console.log(`[SFM] Added ${added} post(s). Total stored: ${loadStoredPosts().length}`);
@@ -864,8 +903,8 @@ function appendWithDedupe(newPosts) {
       <label for="sfm-interval">Automatic check interval (minutes)</label>
       <input id="sfm-interval" type="number" min="1" step="1" />
       <div class="sfm-actions">
-        <button id="sfm-save" class="sfm-primary">Save settings</button>
-        <button id="sfm-half-hour">Use 30 minutes</button>
+        <button id="sfm-start" class="sfm-primary">Begin search run</button>
+        <button id="sfm-debug">Debug</button>
         <button id="sfm-clear">Clear stored data</button>
         <button id="sfm-stop" class="sfm-danger">HARD STOP</button>
       </div>
@@ -897,7 +936,7 @@ function appendWithDedupe(newPosts) {
       hydrate();
     });
 
-    panel.querySelector('#sfm-save').addEventListener('click', () => {
+    panel.querySelector('#sfm-start').addEventListener('click', () => {
       if (state.hardStopped) return;
       const newKeywords = splitListInput(keywords.value);
       const newLocations = splitListInput(locations.value).map(normalizeToken);
@@ -916,13 +955,24 @@ function appendWithDedupe(newPosts) {
       GM_setValue(STORAGE_KEYS.locations, newLocations);
       GM_setValue(STORAGE_KEYS.checkInterval, state.checkInterval);
       startMonitor();
-      GM_notification({ title: 'Social Feed Monitor', text: 'Settings saved.' });
+      GM_notification({ title: 'Social Feed Monitor', text: `Search run started. Checking every ${Math.round(state.checkInterval / 60000)} minute(s).` });
       hydrate();
     });
 
-    panel.querySelector('#sfm-half-hour').addEventListener('click', () => {
-      if (state.hardStopped) return;
-      interval.value = '30';
+    panel.querySelector('#sfm-debug').addEventListener('click', () => {
+      const summary = {
+        platform: state.platform,
+        hardStopped: state.hardStopped,
+        enabled: state.enabled,
+        checkIntervalMinutes: Math.round(state.checkInterval / 60000),
+        keywords: state.keywords,
+        locations: state.locations,
+        storedPosts: loadStoredPosts().length
+      };
+
+      console.log('[SFM Debug] Runtime summary:', summary);
+      GM_notification({ title: 'Social Feed Monitor', text: 'Debug summary written to browser console.' });
+      updateStatusText();
     });
 
     panel.querySelector('#sfm-clear').addEventListener('click', () => {
@@ -948,7 +998,11 @@ function appendWithDedupe(newPosts) {
   function initialize() {
     console.log(`[SFM] Starting on ${state.platform}. Last updated ${LAST_UPDATED}.`);
     createPopupUI();
-    startMonitor();
+    if (state.enabled && !state.hardStopped) {
+      startMonitor();
+    } else {
+      updateStatusText();
+    }
   }
 
   initialize();
