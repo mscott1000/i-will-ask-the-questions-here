@@ -1,0 +1,13 @@
+{
+  "interval_minutes": 30,
+  "credentials_path": "credentials/runtime.json",
+  "platforms": ["x", "instagram", "facebook", "google"],
+  "http": {
+    "retries": 4,
+    "backoff_seconds": 1.25
+  },
+  "sheets": {
+    "webapp_url": "https://script.google.com/macros/s/REPLACE/exec",
+    "sheet_id": "REPLACE_ME"
+  }
+}
