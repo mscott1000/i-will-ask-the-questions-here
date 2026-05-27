@@ -26,6 +26,8 @@
 
 const LOCAL_POSTS_KEY = 'sfm_scraped_posts';
 const SENT_IDS_KEY = 'social_post_leads_sent_entry_ids_v1';
+const RUNTIME_LOG_KEY = 'sfm_runtime_events_v1';
+const MAX_RUNTIME_EVENTS = 500;
 
 const SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyaVJ09hXROkOuorUhb1ix1_2s4cpv2tfjt4Jbu52I7PL2S4GrBKdhd_yriSpM2LWXjyA/exec';
 const SHEETS_SHEET_ID = '1JKS5cHQrz-dK9Bb0hIqUQTpBQjXAnMe4J2JyGKibJSg';
@@ -340,6 +342,28 @@ function sendUnsentLogEntriesToSheet() {
     hardStopped: false,
     activeFetchController: null
   };
+
+  function readRuntimeLog() {
+    const log = GM_getValue(RUNTIME_LOG_KEY, []);
+    return Array.isArray(log) ? log : [];
+  }
+
+  function writeRuntimeLog(log) {
+    GM_setValue(RUNTIME_LOG_KEY, log.slice(-MAX_RUNTIME_EVENTS));
+  }
+
+  function logRuntimeEvent(action, details = {}) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      platform: state.platform,
+      action,
+      details
+    };
+    const log = readRuntimeLog();
+    log.push(entry);
+    writeRuntimeLog(log);
+    return entry;
+  }
 
   function detectPlatform() {
   const host = window.location.hostname.toLowerCase();
@@ -780,6 +804,10 @@ function filterIncongruentLocations(posts) {
 
   async function scrapeOnce() {
   if (!state.enabled || state.hardStopped) return;
+  logRuntimeEvent('scrape_started', {
+    url: window.location.href,
+    storedPostsBefore: loadStoredPosts().length
+  });
 
   state.activeFetchController = new AbortController();
 
@@ -795,22 +823,28 @@ function filterIncongruentLocations(posts) {
 
     if (dropped > 0) {
       console.log(`[SFM] Dropped ${dropped} post(s) due to incongruent associated locations.`);
+      logRuntimeEvent('posts_dropped_for_location', { dropped });
     }
 
     const added = appendWithDedupe(congruentPosts);
 
     if (added > 0) {
       console.log(`[SFM] Added ${added} post(s). Total stored: ${loadStoredPosts().length}`);
+      logRuntimeEvent('posts_added', { added, totalStored: loadStoredPosts().length });
       GM_notification({
         title: 'Social Feed Monitor',
         text: `Captured ${added} new matching post(s).`,
         timeout: 2000
       });
+    } else {
+      logRuntimeEvent('no_new_posts', { parsedCount: parsed.length, keptCount: congruentPosts.length });
     }
 
     sendUnsentLogEntriesToSheet();
+    logRuntimeEvent('log_upload_attempted');
 
     maybeRotateSearchPage();
+    logRuntimeEvent('scrape_finished', { nextSearchIndex: state.searchIndex });
 
   } finally {
     state.activeFetchController = null;
@@ -822,6 +856,7 @@ function filterIncongruentLocations(posts) {
     if (state.timer) clearInterval(state.timer);
     state.timer = setInterval(scrapeOnce, state.checkInterval);
     setTimeout(scrapeOnce, 1500);
+    logRuntimeEvent('monitor_started', { checkIntervalMs: state.checkInterval });
     updateStatusText();
   }
 
@@ -837,6 +872,7 @@ function filterIncongruentLocations(posts) {
       state.activeFetchController.abort();
       state.activeFetchController = null;
     }
+    logRuntimeEvent('hard_stop_activated');
     GM_notification({ title: 'Social Feed Monitor', text: 'Emergency stop activated. All monitor tasks halted.' });
     updateStatusText();
   }
@@ -957,12 +993,18 @@ function filterIncongruentLocations(posts) {
       GM_setValue(STORAGE_KEYS.keywords, newKeywords);
       GM_setValue(STORAGE_KEYS.locations, newLocations);
       GM_setValue(STORAGE_KEYS.checkInterval, state.checkInterval);
+      logRuntimeEvent('settings_updated', {
+        keywordsCount: newKeywords.length,
+        locationsCount: newLocations.length,
+        checkIntervalMs: state.checkInterval
+      });
       startMonitor();
       GM_notification({ title: 'Social Feed Monitor', text: `Search run started. Checking every ${Math.round(state.checkInterval / 60000)} minute(s).` });
       hydrate({ preserveInputs: false });
     });
 
     panel.querySelector('#sfm-debug').addEventListener('click', () => {
+      const runtimeLog = readRuntimeLog();
       const summary = {
         platform: state.platform,
         hardStopped: state.hardStopped,
@@ -970,17 +1012,21 @@ function filterIncongruentLocations(posts) {
         checkIntervalMinutes: Math.round(state.checkInterval / 60000),
         keywords: state.keywords,
         locations: state.locations,
-        storedPosts: loadStoredPosts().length
+        storedPosts: loadStoredPosts().length,
+        runtimeEventsLogged: runtimeLog.length,
+        lastRuntimeEvents: runtimeLog.slice(-20)
       };
 
       console.log('[SFM Debug] Runtime summary:', summary);
-      GM_notification({ title: 'Social Feed Monitor', text: 'Debug summary written to browser console.' });
+      console.table(summary.lastRuntimeEvents);
+      GM_notification({ title: 'Social Feed Monitor', text: `Debug summary + ${summary.lastRuntimeEvents.length} recent runtime events written to browser console.` });
       updateStatusText();
     });
 
     panel.querySelector('#sfm-clear').addEventListener('click', () => {
       if (!window.confirm('Delete all locally stored captured posts?')) return;
       GM_deleteValue(STORAGE_KEYS.data);
+      GM_deleteValue(RUNTIME_LOG_KEY);
       GM_notification({ title: 'Social Feed Monitor', text: 'Stored data cleared.' });
       updateStatusText();
     });
@@ -1000,6 +1046,7 @@ function filterIncongruentLocations(posts) {
 
   function initialize() {
     console.log(`[SFM] Starting on ${state.platform}. Last updated ${LAST_UPDATED}.`);
+    logRuntimeEvent('script_initialized', { versionDate: LAST_UPDATED });
     createPopupUI();
     if (state.enabled && !state.hardStopped) {
       startMonitor();
