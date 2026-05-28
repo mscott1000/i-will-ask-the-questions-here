@@ -325,24 +325,9 @@ function isBlockedOrVerificationPage(url = window.location.href) {
     searchIndex: 'sfm_search_index'
   };
 
-  const DEFAULT_KEYWORDS = [
-    'looking for someone to host trivia', 'looking for trivia host', 'someone to host trivia', 'host trivia night',
-    'trivia host', 'host trivia', 'trivia company', 'trivia night', 'weekly events', 'new weekly event',
-    'tuesday night', 'wednesday night', 'karaoke and trivia', 'music bingo', 'bar events', 'restaurant events',
-    'slow night', 'what events should we add', 'trivia night coming soon', 'now booking events',
-    'looking for something fun on tuesdays', 'nonprofit trivia venue', 'looking for karaoke/trivia hosting',
-    'event host needed', 'pub quiz host', 'quiz night host', 'themed trivia', 'team trivia',
-    'happy hour trivia', 'special event host', 'emcee needed', 'game night', 'open mic', 'karaoke night',
-    'new ownership', 'tuesday specials', 'wednesday specials', 'private events', 'community night', 'midweek crowd'
-  ];
+  const DEFAULT_KEYWORDS = []; // intentionally empty: users provide keywords per run
 
-  const DEFAULT_LOCATIONS = [
-    'st. louis', 'st louis', 'stl', 'south city', 'soulard', 'dogtown', 'the grove', 'tower grove', 'maplewood',
-    'webster groves', 'kirkwood', 'clayton', 'central west end', 'metro east', 'st. charles', 'florissant',
-    'south county', 'north county', 'chesterfield', 'creve coeur', 'ladue', 'university city', 'u city', 'downtown stl',
-    'cwe', 'shaw', 'benton park', 'lafayette square', 'richmond heights', 'brentwood', 'rock hill', 'sunset hills',
-    'ballwin', 'wildwood', 'maryland heights'
-  ];
+  const DEFAULT_LOCATIONS = []; // intentionally empty: users provide locations per run
 
   const GOOGLE_QUERY_PATTERNS = [
     '"looking for someone to host trivia"', '"looking for trivia host"', '"someone to host trivia"', '"host trivia night"',
@@ -957,8 +942,8 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
 }
 
   function buildSearchUrls() {
-  const areas = state.locations.length ? state.locations : DEFAULT_LOCATIONS;
-  const terms = state.keywords.length ? state.keywords : DEFAULT_KEYWORDS;
+  const areas = state.locations;
+  const terms = state.keywords;
   const googleUrls = [];
 
   const areaSlice = areas.slice(0, 20);
@@ -1187,7 +1172,7 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
       }
       const controls = [keywords, locations, interval];
       controls.forEach((el) => {
-        el.disabled = state.hardStopped;
+        el.disabled = false;
       });
       updateStatusText();
     }
@@ -1200,15 +1185,19 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
     });
 
     panel.querySelector('#sfm-start').addEventListener('click', () => {
-      if (state.hardStopped) return;
       const newKeywords = splitListInput(keywords.value);
       const newLocations = splitListInput(locations.value).map(normalizeToken);
       const minutes = Number(interval.value);
+      if (newKeywords.length === 0 || newLocations.length === 0) {
+        window.alert('Add at least one keyword and one location before starting autorun.');
+        return;
+      }
       if (!Number.isFinite(minutes) || minutes < 1) {
         window.alert('Interval must be 1 minute or more.');
         return;
       }
 
+      state.hardStopped = false;
       state.keywords = newKeywords;
       state.locations = newLocations;
       state.checkInterval = Math.max(MIN_INTERVAL_MS, Math.round(minutes * 60000));
