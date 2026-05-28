@@ -50,16 +50,22 @@ function doPost(e) {
 
       const rowsToInsert = [];
       let skippedDuplicates = 0;
+      let skippedNonEnglish = 0;
 
       for (const row of candidateRows) {
-        const key = makeDedupeKeyFromRow(row);
+        if (!isPrimarilyEnglishText(row[2])) {
+          skippedNonEnglish += 1;
+          continue;
+        }
 
-        if (key && existingKeys.has(key)) {
+        const keys = makeDedupeKeysFromRow(row);
+
+        if (keys.some(key => existingKeys.has(key))) {
           skippedDuplicates += 1;
           continue;
         }
 
-        if (key) existingKeys.add(key);
+        keys.forEach(key => existingKeys.add(key));
         rowsToInsert.push(row);
       }
 
@@ -72,7 +78,8 @@ function doPost(e) {
         ok: true,
         received: entries.length,
         inserted: rowsToInsert.length,
-        skippedDuplicates
+        skippedDuplicates,
+        skippedNonEnglish
       });
 
     } finally {
@@ -105,18 +112,19 @@ function rowHasUsefulData(row) {
   return Boolean(site || text || link);
 }
 
-function makeDedupeKeyFromRow(row) {
+function makeDedupeKeysFromRow(row) {
   const site = cleanCellText(row[1]).toLowerCase();
   const text = cleanCellText(row[2]).toLowerCase();
   const postedAt = cleanCellText(row[3]).toLowerCase();
   const link = normalizeLinkForDedupe(row[4]);
+  const keys = [];
 
-  if (link) {
-    return `${site}|${link}`;
-  }
+  if (link) keys.push(`${site}|link|${link}`);
+  if (text) keys.push(`${site}|text|${postedAt}|${text.slice(0, 250)}`);
 
-  return `${site}|${postedAt}|${text.slice(0, 250)}`;
+  return keys;
 }
+
 
 function getExistingDedupeKeys(sheet) {
   const keys = new Set();
@@ -127,8 +135,7 @@ function getExistingDedupeKeys(sheet) {
   const values = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
 
   for (const row of values) {
-    const key = makeDedupeKeyFromRow(row);
-    if (key) keys.add(key);
+    makeDedupeKeysFromRow(row).forEach(key => keys.add(key));
   }
 
   return keys;
@@ -140,6 +147,12 @@ function normalizeLinkForDedupe(value) {
 
   try {
     const url = new URL(raw);
+
+    if ((url.hostname === 'www.google.com' || url.hostname === 'google.com') && url.pathname === '/url') {
+      const target = url.searchParams.get('q') || url.searchParams.get('url');
+      if (target) return normalizeLinkForDedupe(target);
+    }
+
     url.hash = '';
 
     [
@@ -150,7 +163,10 @@ function normalizeLinkForDedupe(value) {
       'utm_medium',
       'utm_campaign',
       'utm_term',
-      'utm_content'
+      'utm_content',
+      'ved',
+      'usg',
+      'sa'
     ].forEach(param => url.searchParams.delete(param));
 
     return url.href.replace(/\/$/, '').toLowerCase();
@@ -158,6 +174,37 @@ function normalizeLinkForDedupe(value) {
     return raw.replace(/\/$/, '').toLowerCase();
   }
 }
+
+function isPrimarilyEnglishText(text) {
+  const cleaned = cleanCellText(text);
+  if (!cleaned) return false;
+
+  const letters = cleaned.match(/\p{L}/gu) || [];
+  if (!letters.length) return false;
+
+  const nonLatinLetters = cleaned.match(/[\p{Script=Arabic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Hebrew}\p{Script=Thai}\p{Script=Devanagari}]/gu) || [];
+  if (nonLatinLetters.length / letters.length > 0.2) return false;
+
+  const asciiLetters = cleaned.match(/[A-Za-z]/g) || [];
+  if (asciiLetters.length / letters.length < 0.75) return false;
+
+  const words = cleaned.toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) || [];
+  if (words.length < 4) return asciiLetters.length >= 12;
+
+  const englishMarkers = new Set([
+    'a', 'about', 'after', 'all', 'also', 'am', 'an', 'and', 'are', 'as', 'at',
+    'be', 'been', 'but', 'by', 'can', 'for', 'from', 'get', 'has', 'have',
+    'he', 'her', 'here', 'his', 'how', 'i', 'if', 'in', 'into', 'is', 'it',
+    'its', 'just', 'me', 'my', 'near', 'new', 'not', 'now', 'of', 'on',
+    'or', 'our', 'out', 'over', 'post', 'she', 'so', 'that', 'the', 'their',
+    'there', 'they', 'this', 'to', 'up', 'us', 'was', 'we', 'were', 'what',
+    'when', 'where', 'who', 'will', 'with', 'you', 'your'
+  ]);
+  const markerCount = words.filter(word => englishMarkers.has(word)).length;
+
+  return markerCount >= 1 || (words.length >= 8 && asciiLetters.length / cleaned.length > 0.55);
+}
+
 
 function ensureHeaderRow(sheet) {
   const lastColumn = sheet.getLastColumn();

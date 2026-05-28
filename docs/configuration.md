@@ -27,7 +27,9 @@ The userscript now includes a background sender that posts **new unsent entries*
   3. Text
   4. Posted At
   5. Link
-- Sent-entry tracking is stored in Tampermonkey under `social_post_leads_sent_entry_ids_v1` so only new records are forwarded after a successful response.
+- Sent-entry tracking is stored in Tampermonkey under `social_post_leads_sent_entry_ids_by_day_v1` so only new records are forwarded after a successful response.
+- Dedupe uses normalized post links, post IDs, and text/date fallbacks both before local storage and during Google Apps Script ingest, so rows already present in the sheet are skipped on later uploads.
+- Posts must be primarily English before they are stored locally or accepted by the sheet ingest endpoint; non-English rows are skipped and counted in the ingest response.
 - Web app endpoint and sheet id are controlled in `tampermonkey/social-feed-monitor.user.js` (`SHEETS_WEBAPP_URL` and `SHEETS_SHEET_ID`).
 
 The current Google Apps Script used by production is checked in at `google-sheet-lead-ingest`.
