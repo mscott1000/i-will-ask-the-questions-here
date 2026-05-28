@@ -56,6 +56,19 @@ function cleanPostText(value) {
     .trim();
 }
 
+function formatPostedAtForSheet(value) {
+  const cleaned = cleanPostText(value);
+  if (!cleaned) return '';
+
+  const parsed = new Date(cleaned);
+  if (Number.isNaN(parsed.getTime())) return '';
+
+  const month = pad2(parsed.getMonth() + 1);
+  const day = pad2(parsed.getDate());
+  const year = parsed.getFullYear();
+  return `${month}/${day}/${year}`;
+}
+
 function collectMeaningfulPostText(entry) {
   const possibleTextFields = [
     entry.text,
@@ -123,7 +136,7 @@ function normalizeEntryForSheet(entry, dateGenerated) {
     ''
   );
 
-  const postedAt = cleanPostText(
+  const postedAtRaw = cleanPostText(
     entry.postedAt ||
     entry.posted_at ||
     entry.timestamp ||
@@ -131,6 +144,7 @@ function normalizeEntryForSheet(entry, dateGenerated) {
     entry.time ||
     ''
   );
+  const postedAt = formatPostedAtForSheet(postedAtRaw) || postedAtRaw;
 
   const site = normalizeSiteForSheet(
     entry.site ||
@@ -891,6 +905,53 @@ function filterIncongruentLocations(posts) {
   return { kept, dropped };
 }
 
+function getPostOriginDate(post) {
+  if (!post || typeof post !== 'object') return null;
+
+  const rawDate = cleanPostText(
+    post.postedAt ||
+    post.posted_at ||
+    post.timestamp ||
+    post.createdAt ||
+    post.time ||
+    ''
+  );
+  if (!rawDate) return null;
+
+  const parsed = new Date(rawDate);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return parsed;
+}
+
+function filterPostsOlderThanSixMonths(posts, now = new Date()) {
+  if (!posts.length) return { kept: posts, dropped: 0 };
+
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - 6);
+
+  const kept = [];
+  let dropped = 0;
+
+  for (const post of posts) {
+    const originDate = getPostOriginDate(post);
+    if (!originDate) {
+      kept.push(post);
+      continue;
+    }
+
+    post.postedAt = formatPostedAtForSheet(originDate.toISOString());
+    if (originDate < cutoff) {
+      dropped += 1;
+      continue;
+    }
+
+    kept.push(post);
+  }
+
+  return { kept, dropped };
+}
+
   function stripQuotes(value) {
   return String(value || '').replace(/"/g, '').trim();
 }
@@ -970,13 +1031,18 @@ function filterIncongruentLocations(posts) {
     if (state.hardStopped) return;
 
     const { kept: congruentPosts, dropped } = filterIncongruentLocations(parsed);
+    const { kept: recentPosts, dropped: droppedForAge } = filterPostsOlderThanSixMonths(congruentPosts);
 
     if (dropped > 0) {
       console.log(`[SFM] Dropped ${dropped} post(s) due to incongruent associated locations.`);
       logRuntimeEvent('posts_dropped_for_location', { dropped });
     }
+    if (droppedForAge > 0) {
+      console.log(`[SFM] Dropped ${droppedForAge} post(s) older than six months.`);
+      logRuntimeEvent('posts_dropped_for_age', { dropped: droppedForAge });
+    }
 
-    const added = appendWithDedupe(congruentPosts);
+    const added = appendWithDedupe(recentPosts);
 
     if (added > 0) {
       console.log(`[SFM] Added ${added} post(s). Total stored: ${loadStoredPosts().length}`);
@@ -987,10 +1053,10 @@ function filterIncongruentLocations(posts) {
         timeout: 2000
       });
     } else {
-      logRuntimeEvent('no_new_posts', { parsedCount: parsed.length, keptCount: congruentPosts.length });
+      logRuntimeEvent('no_new_posts', { parsedCount: parsed.length, keptCount: recentPosts.length });
     }
 
-    if (shouldSkipDuplicateSheetLog({ parsedCount: parsed.length, keptCount: congruentPosts.length, added })) {
+    if (shouldSkipDuplicateSheetLog({ parsedCount: parsed.length, keptCount: recentPosts.length, added })) {
       logRuntimeEvent('duplicate_log_skipped', {
         reason: 'blocked_or_verification_page',
         url: window.location.href
