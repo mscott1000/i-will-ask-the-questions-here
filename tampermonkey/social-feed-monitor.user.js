@@ -584,10 +584,115 @@ function attemptGoogleRobotCheck() {
       location: null,
       url: link,
       time: null,
+      originTimeSource: null,
+      originTimeConfidence: null,
       capturedAt: new Date().toISOString(),
       matchedKeywords,
       matchedLocations
     };
+  }
+
+  function requestText(url, timeout = 15000) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url,
+        timeout,
+        onload: (response) => resolve({ ok: true, text: response.responseText || '' }),
+        onerror: () => resolve({ ok: false, text: '' }),
+        ontimeout: () => resolve({ ok: false, text: '' })
+      });
+    });
+  }
+
+  function firstMetaContent(documentNode, selectors) {
+    for (const selector of selectors) {
+      const value = documentNode.querySelector(selector)?.getAttribute('content');
+      if (value && String(value).trim()) return String(value).trim();
+    }
+    return null;
+  }
+
+  function extractDateFromJsonLd(documentNode) {
+    const scripts = Array.from(documentNode.querySelectorAll('script[type="application/ld+json"]'));
+
+    for (const script of scripts) {
+      const text = script.textContent || '';
+      if (!text.trim()) continue;
+
+      try {
+        const payload = JSON.parse(text);
+        const queue = Array.isArray(payload) ? [...payload] : [payload];
+
+        while (queue.length) {
+          const node = queue.shift();
+          if (!node || typeof node !== 'object') continue;
+
+          const datePublished = node.datePublished || node.uploadDate || node.dateCreated;
+          if (datePublished && String(datePublished).trim()) {
+            return String(datePublished).trim();
+          }
+
+          if (Array.isArray(node['@graph'])) queue.push(...node['@graph']);
+          if (Array.isArray(node.itemListElement)) queue.push(...node.itemListElement);
+          if (node.mainEntity && typeof node.mainEntity === 'object') queue.push(node.mainEntity);
+        }
+      } catch (error) {
+        // Ignore malformed JSON-LD blocks.
+      }
+    }
+
+    return null;
+  }
+
+  async function enrichGoogleResultOriginTime(post) {
+    if (!post || post.platform !== 'google' || post.time || !post.url) return post;
+
+    const response = await requestText(post.url);
+    if (!response.ok || !response.text) return post;
+
+    const documentNode = new DOMParser().parseFromString(response.text, 'text/html');
+    const metaPublished = firstMetaContent(documentNode, [
+      'meta[property="article:published_time"]',
+      'meta[name="article:published_time"]',
+      'meta[itemprop="datePublished"]',
+      'meta[property="og:published_time"]',
+      'meta[name="publish_date"]'
+    ]);
+
+    if (metaPublished) {
+      return {
+        ...post,
+        time: metaPublished,
+        originTimeSource: 'meta',
+        originTimeConfidence: 'high'
+      };
+    }
+
+    const jsonLdPublished = extractDateFromJsonLd(documentNode);
+    if (jsonLdPublished) {
+      return {
+        ...post,
+        time: jsonLdPublished,
+        originTimeSource: 'jsonld',
+        originTimeConfidence: 'high'
+      };
+    }
+
+    const visibleTime = documentNode.querySelector('time[datetime]')?.getAttribute('datetime') ||
+      documentNode.querySelector('meta[name="date"]')?.getAttribute('content') ||
+      null;
+
+    if (visibleTime && String(visibleTime).trim()) {
+      return {
+        ...post,
+        time: String(visibleTime).trim(),
+        originTimeSource: 'visible',
+        originTimeConfidence: 'medium'
+      };
+    }
+
+    return post;
   }
 
   function parsePost(element) {
@@ -852,6 +957,12 @@ function filterIncongruentLocations(posts) {
     attemptGoogleRobotCheck();
 
     const parsed = allPosts().map(parsePost).filter(Boolean);
+    if (state.platform === 'google' && parsed.length > 0) {
+      for (let i = 0; i < parsed.length; i += 1) {
+        if (state.hardStopped) break;
+        parsed[i] = await enrichGoogleResultOriginTime(parsed[i]);
+      }
+    }
     const instagramLocationMatches = await scrapeInstagramLocationPage();
 
     parsed.push(...instagramLocationMatches);
