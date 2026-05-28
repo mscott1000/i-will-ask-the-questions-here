@@ -25,7 +25,7 @@
 
 
 const LOCAL_POSTS_KEY = 'sfm_scraped_posts';
-const SENT_IDS_KEY = 'social_post_leads_sent_entry_ids_v1';
+const SENT_IDS_BY_DAY_KEY = 'social_post_leads_sent_entry_ids_by_day_v1';
 const RUNTIME_LOG_KEY = 'sfm_runtime_events_v1';
 const MAX_RUNTIME_EVENTS = 500;
 
@@ -175,17 +175,41 @@ function getPersistentLog() {
   }
 }
 
-function setSentIds(sentIds) {
-  GM_setValue(SENT_IDS_KEY, Array.from(sentIds));
+function dateKeyLocal(date = new Date()) {
+  const year = date.getFullYear();
+  const month = pad2(date.getMonth() + 1);
+  const day = pad2(date.getDate());
+  return `${year}-${month}-${day}`;
 }
 
-function getSentIds() {
-  return new Set(GM_getValue(SENT_IDS_KEY, []));
+function getSentIdsMap() {
+  const raw = GM_getValue(SENT_IDS_BY_DAY_KEY, {});
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return raw;
+}
+
+function setSentIdsMap(map) {
+  GM_setValue(SENT_IDS_BY_DAY_KEY, map);
+}
+
+function pruneSentIdsMap(map, keepDays = 14) {
+  const keys = Object.keys(map).sort();
+  if (keys.length <= keepDays) return map;
+  const pruned = {};
+  for (const key of keys.slice(-keepDays)) {
+    pruned[key] = Array.isArray(map[key]) ? map[key] : [];
+  }
+  return pruned;
+}
+
+function getSentIdsForToday() {
+  const map = getSentIdsMap();
+  return new Set(map[dateKeyLocal()] || []);
 }
 
 function getUnsentEntries() {
   const log = getPersistentLog();
-  const sentIds = getSentIds();
+  const sentIds = getSentIdsForToday();
 
   return log
     .map(entry => ({
@@ -196,13 +220,16 @@ function getUnsentEntries() {
 }
 
 function markEntriesSent(items) {
-  const sentIds = getSentIds();
+  const map = getSentIdsMap();
+  const today = dateKeyLocal();
+  const sentIds = new Set(map[today] || []);
 
   for (const item of items) {
     sentIds.add(item.id);
   }
 
-  setSentIds(sentIds);
+  map[today] = Array.from(sentIds);
+  setSentIdsMap(pruneSentIdsMap(map));
 }
 
 function sendUnsentLogEntriesToSheet() {
@@ -490,6 +517,30 @@ function derivePostId(element) {
   }
 
   return `derived-${Math.abs(hash)}`;
+}
+
+  
+function attemptGoogleRobotCheck() {
+  if (state.platform !== 'google') return false;
+  const frames = Array.from(document.querySelectorAll('iframe[src*="recaptcha"], iframe[title*="recaptcha" i], iframe[title*="not a robot" i]'));
+  for (const frame of frames) {
+    try {
+      const doc = frame.contentDocument || frame.contentWindow?.document;
+      if (!doc) continue;
+      const checkbox =
+        doc.querySelector('#recaptcha-anchor') ||
+        doc.querySelector('div[role="checkbox"][aria-label*="robot" i]') ||
+        doc.querySelector('span[role="checkbox"][aria-label*="robot" i]');
+      if (checkbox) {
+        checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        logRuntimeEvent('google_robot_check_clicked', { frameTitle: frame.title || null });
+        return true;
+      }
+    } catch (error) {
+      logRuntimeEvent('google_robot_check_inaccessible_frame', { message: String(error) });
+    }
+  }
+  return false;
 }
 
   function parseTime(element) {
@@ -812,6 +863,8 @@ function filterIncongruentLocations(posts) {
   state.activeFetchController = new AbortController();
 
   try {
+    attemptGoogleRobotCheck();
+
     const parsed = allPosts().map(parsePost).filter(Boolean);
     const instagramLocationMatches = await scrapeInstagramLocationPage();
 
@@ -1017,9 +1070,26 @@ function filterIncongruentLocations(posts) {
         lastRuntimeEvents: runtimeLog.slice(-20)
       };
 
-      console.log('[SFM Debug] Runtime summary:', summary);
-      console.table(summary.lastRuntimeEvents);
-      GM_notification({ title: 'Social Feed Monitor', text: `Debug summary + ${summary.lastRuntimeEvents.length} recent runtime events written to browser console.` });
+      const debugText = [
+        '[SFM Debug Snapshot]',
+        `Timestamp: ${new Date().toISOString()}`,
+        `URL: ${window.location.href}`,
+        `Platform: ${summary.platform}`,
+        `Enabled: ${summary.enabled}`,
+        `Hard stopped: ${summary.hardStopped}`,
+        `Interval (min): ${summary.checkIntervalMinutes}`,
+        `Keywords count: ${summary.keywords.length}`,
+        `Locations count: ${summary.locations.length}`,
+        `Stored posts: ${summary.storedPosts}`,
+        `Runtime events logged: ${summary.runtimeEventsLogged}`,
+        '',
+        '[Recent Runtime Events]',
+        ...summary.lastRuntimeEvents.map((entry) => `${entry.timestamp} | ${entry.action} | ${JSON.stringify(entry.details)}`)
+      ].join('\n');
+
+      console.log(debugText);
+      navigator.clipboard?.writeText(debugText).catch(() => {});
+      GM_notification({ title: 'Social Feed Monitor', text: `Debug snapshot logged (${summary.lastRuntimeEvents.length} events). Copied to clipboard when allowed.` });
       updateStatusText();
     });
 
@@ -1027,6 +1097,7 @@ function filterIncongruentLocations(posts) {
       if (!window.confirm('Delete all locally stored captured posts?')) return;
       GM_deleteValue(STORAGE_KEYS.data);
       GM_deleteValue(RUNTIME_LOG_KEY);
+      GM_deleteValue(SENT_IDS_BY_DAY_KEY);
       GM_notification({ title: 'Social Feed Monitor', text: 'Stored data cleared.' });
       updateStatusText();
     });
