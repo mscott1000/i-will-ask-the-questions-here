@@ -285,6 +285,18 @@ function sendUnsentLogEntriesToSheet() {
   });
 }
 
+function isBlockedOrVerificationPage(url = window.location.href) {
+  const normalized = String(url || '').toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized.includes('instagram.com/accounts/suspended') ||
+    normalized.includes('instagram.com/challenge') ||
+    normalized.includes('instagram.com/accounts/login') ||
+    normalized.includes('checkpoint')
+  );
+}
+
   const LAST_UPDATED = '2026-04-28';
   const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
   const MIN_INTERVAL_MS = 60 * 1000;
@@ -783,59 +795,33 @@ function filterIncongruentLocations(posts) {
   const terms = state.keywords.length ? state.keywords : DEFAULT_KEYWORDS;
   const googleUrls = [];
 
-  const googleDomains = [
-    'instagram.com',
-    'facebook.com',
-    'x.com',
-    'twitter.com'
-  ];
-
   const areaSlice = areas.slice(0, 20);
   const termSlice = terms.slice(0, 20);
 
-  for (const domain of googleDomains) {
-    for (const area of areaSlice) {
-      for (const term of termSlice) {
-        const query = `site:${domain} "${area}" "${term}"`;
-        googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
-      }
-    }
-  }
-
-  const instagramTags = Array.from(new Set([
-    ...INSTAGRAM_HASHTAGS,
-    ...areas.map(area => area.replace(/[^a-z0-9]/gi, ''))
-  ].filter(Boolean)));
-
-  const instagramUrls = instagramTags
-    .slice(0, 40)
-    .map(tag => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`);
-
-  const facebookUrls = [];
-
   for (const area of areaSlice) {
     for (const term of termSlice) {
-      const query = `${area} ${term}`;
-      facebookUrls.push(`https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`);
+      const query = `"${area}" "${term}"`;
+      googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
     }
   }
 
-  const xUrls = [];
-
-  for (const area of areaSlice) {
-    for (const term of termSlice) {
-      const query = `${area} ${term}`;
-      xUrls.push(`https://x.com/search?q=${encodeURIComponent(query)}&src=typed_query&f=live`);
+  for (const pattern of GOOGLE_QUERY_PATTERNS) {
+    for (const area of areaSlice.slice(0, 10)) {
+      const query = `${pattern} "${area}"`;
+      googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
     }
   }
 
-  return [
-    ...googleUrls,
-    ...instagramUrls,
-    ...facebookUrls,
-    ...xUrls
-  ];
+  return Array.from(new Set(googleUrls));
 }
+
+  function shouldSkipDuplicateSheetLog({ parsedCount, keptCount, added }) {
+    if (added > 0) return false;
+    if (parsedCount > 0 || keptCount > 0) return false;
+    if (!isBlockedOrVerificationPage(window.location.href)) return false;
+
+    return true;
+  }
 
   function maybeRotateSearchPage() {
     if (state.hardStopped || !state.autoRotateSearch) return;
@@ -893,8 +879,16 @@ function filterIncongruentLocations(posts) {
       logRuntimeEvent('no_new_posts', { parsedCount: parsed.length, keptCount: congruentPosts.length });
     }
 
-    sendUnsentLogEntriesToSheet();
-    logRuntimeEvent('log_upload_attempted');
+    if (shouldSkipDuplicateSheetLog({ parsedCount: parsed.length, keptCount: congruentPosts.length, added })) {
+      logRuntimeEvent('duplicate_log_skipped', {
+        reason: 'blocked_or_verification_page',
+        url: window.location.href
+      });
+      console.log('[SFM] Duplicate log skipped due to blocked/verification page.');
+    } else {
+      sendUnsentLogEntriesToSheet();
+      logRuntimeEvent('log_upload_attempted');
+    }
 
     maybeRotateSearchPage();
     logRuntimeEvent('scrape_finished', { nextSearchIndex: state.searchIndex });
