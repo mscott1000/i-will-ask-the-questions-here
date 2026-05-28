@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Socials Lead Generator
 // @namespace    http://tampermonkey.net/
-// @version      2.4.1
+// @version      2.4.2
 // @description  Monitors social/search feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
@@ -311,46 +311,19 @@ function isBlockedOrVerificationPage(url = window.location.href) {
   );
 }
 
-  const LAST_UPDATED = '2026-04-28';
+  const LAST_UPDATED = '2026-05-28';
   const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
   const MIN_INTERVAL_MS = 60 * 1000;
 
   const STORAGE_KEYS = {
     data: LOCAL_POSTS_KEY,
-    keywords: 'sfm_keywords',
-    locations: 'sfm_locations',
     checkInterval: 'sfm_check_interval_ms',
     enabled: 'sfm_enabled',
     autoRotateSearch: 'sfm_auto_rotate_search',
     searchIndex: 'sfm_search_index'
   };
 
-  const DEFAULT_KEYWORDS = []; // intentionally empty: users provide keywords per run
-
-  const DEFAULT_LOCATIONS = []; // intentionally empty: users provide locations per run
-
-  const GOOGLE_QUERY_PATTERNS = [
-    '"looking for someone to host trivia"', '"looking for trivia host"', '"someone to host trivia"', '"host trivia night"',
-    '"trivia company"', '"karaoke and trivia" "tuesday"', '"weekly events" "bar"', '"new weekly event" "restaurant"',
-    '"tuesday night" "bar" "trivia"', '"wednesday night" "bar" "trivia"', '"music bingo"', '"karaoke night" "tuesday"',
-    '"game night" bar', '"new ownership" bar', '"tuesday specials" bar', '"wednesday specials" bar',
-    '"bar events"', '"restaurant events"', '"slow night" restaurant OR bar', '"now booking events"',
-    '"what events should we add"', '"trivia night coming soon"', '"looking for karaoke/trivia hosting"', '"nonprofit trivia venue"',
-    '"pub quiz host"', '"team trivia"', '"themed trivia"', '"weekly entertainment"',
-    '"open mic" "weekly event"', '"midweek event ideas"'
-  ];
-
-  const INSTAGRAM_HASHTAGS = [
-    'stltrivia', 'stlouistrivia', 'trivianightstl', 'stlouisbar', 'stlbars', 'stlrestaurants', 'stlnightlife',
-    'stlevents', 'southcitystl', 'soulard', 'thegrovestl', 'towergrove', 'maplewoodmo', 'dogtownstl', 'centralwestend',
-    'stlhappyhour', 'stlfoodscene', 'stlbarlife', 'stlcommunity', 'stlbusiness', 'stlentertainment', 'stllocal',
-    'stcharlesmo', 'metroeast', 'stlouissmallbusiness', 'stlweekend', 'stlmidweek', 'stlpub', 'stlrestaurantscene',
-    'stlnightout', 'stlbeverages', 'stlvenue'
-  ];
-
   const DEFAULTS = {
-    keywords: DEFAULT_KEYWORDS,
-    locations: DEFAULT_LOCATIONS,
     checkInterval: TWO_HOURS_MS,
     maxPostsPerCheck: 50
   };
@@ -368,11 +341,11 @@ function isBlockedOrVerificationPage(url = window.location.href) {
 
   const state = {
     platform: detectPlatform(),
-    keywords: loadArray(STORAGE_KEYS.keywords, DEFAULTS.keywords),
-    locations: loadArray(STORAGE_KEYS.locations, DEFAULTS.locations).map(normalizeToken),
+    keywords: [],
+    locations: [],
     checkInterval: loadNumber(STORAGE_KEYS.checkInterval, DEFAULTS.checkInterval),
-    enabled: loadBoolean(STORAGE_KEYS.enabled, true),
-    autoRotateSearch: loadBoolean(STORAGE_KEYS.autoRotateSearch, true),
+    enabled: false,
+    autoRotateSearch: true,
     searchIndex: loadNumber(STORAGE_KEYS.searchIndex, 0),
     instagramFetchedUrls: new Set(),
     timer: null,
@@ -413,16 +386,6 @@ function isBlockedOrVerificationPage(url = window.location.href) {
 
   return 'unknown';
 }
-
-  function loadArray(key, fallback) {
-    const value = GM_getValue(key, fallback);
-    return Array.isArray(value) ? value : fallback;
-  }
-
-  function loadBoolean(key, fallback) {
-    const value = GM_getValue(key, fallback);
-    return typeof value === 'boolean' ? value : fallback;
-  }
 
   function loadNumber(key, fallback) {
     const value = Number(GM_getValue(key, fallback));
@@ -937,14 +900,24 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
   return { kept, dropped };
 }
 
-  function stripQuotes(value) {
-  return String(value || '').replace(/"/g, '').trim();
+  function syncSearchTermsFromUi() {
+  if (!state.ui) {
+    state.keywords = [];
+    state.locations = [];
+    return { keywords: state.keywords, locations: state.locations };
+  }
+
+  state.keywords = splitListInput(state.ui.keywords.value);
+  state.locations = splitListInput(state.ui.locations.value).map(normalizeToken);
+
+  return { keywords: state.keywords, locations: state.locations };
 }
 
   function buildSearchUrls() {
-  const areas = state.locations;
-  const terms = state.keywords;
+  const { keywords: terms, locations: areas } = syncSearchTermsFromUi();
   const googleUrls = [];
+
+  if (areas.length === 0 || terms.length === 0) return googleUrls;
 
   const areaSlice = areas.slice(0, 20);
   const termSlice = terms.slice(0, 20);
@@ -952,13 +925,6 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
   for (const area of areaSlice) {
     for (const term of termSlice) {
       const query = `"${area}" "${term}"`;
-      googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
-    }
-  }
-
-  for (const pattern of GOOGLE_QUERY_PATTERNS) {
-    for (const area of areaSlice.slice(0, 10)) {
-      const query = `${pattern} "${area}"`;
       googleUrls.push(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
     }
   }
@@ -992,6 +958,12 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
 
   async function scrapeOnce() {
   if (!state.enabled || state.hardStopped) return;
+  const { keywords, locations } = syncSearchTermsFromUi();
+  if (keywords.length === 0 || locations.length === 0) {
+    logRuntimeEvent('scrape_skipped_missing_ui_terms');
+    return;
+  }
+
   logRuntimeEvent('scrape_started', {
     url: window.location.href,
     storedPostsBefore: loadStoredPosts().length
@@ -1198,13 +1170,13 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
       }
 
       state.hardStopped = false;
+      state.enabled = true;
+      state.autoRotateSearch = true;
       state.keywords = newKeywords;
       state.locations = newLocations;
       state.checkInterval = Math.max(MIN_INTERVAL_MS, Math.round(minutes * 60000));
       GM_setValue(STORAGE_KEYS.enabled, true);
       GM_setValue(STORAGE_KEYS.autoRotateSearch, true);
-      GM_setValue(STORAGE_KEYS.keywords, newKeywords);
-      GM_setValue(STORAGE_KEYS.locations, newLocations);
       GM_setValue(STORAGE_KEYS.checkInterval, state.checkInterval);
       logRuntimeEvent('settings_updated', {
         keywordsCount: newKeywords.length,
@@ -1276,14 +1248,12 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
   }
 
   function initialize() {
+    state.enabled = false;
+    GM_setValue(STORAGE_KEYS.enabled, false);
     console.log(`[SFM] Starting on ${state.platform}. Last updated ${LAST_UPDATED}.`);
     logRuntimeEvent('script_initialized', { versionDate: LAST_UPDATED });
     createPopupUI();
-    if (state.enabled && !state.hardStopped) {
-      startMonitor();
-    } else {
-      updateStatusText();
-    }
+    updateStatusText();
   }
 
   initialize();
