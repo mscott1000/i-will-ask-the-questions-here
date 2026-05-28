@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Socials Lead Generator
 // @namespace    http://tampermonkey.net/
-// @version      2.4.3
+// @version      2.4.4
 // @description  Monitors social/search feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
@@ -54,6 +54,52 @@ function cleanPostText(value) {
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function getExplicitLanguage(root) {
+  if (!root?.querySelector) return '';
+
+  const explicit = root.getAttribute?.('lang') || root.querySelector('[lang]')?.getAttribute('lang') || '';
+  return String(explicit || '').trim().toLowerCase();
+}
+
+function isExplicitlyNonEnglishLanguage(language) {
+  if (!language) return false;
+  return !language.startsWith('en');
+}
+
+function isPrimarilyEnglishText(text, explicitLanguage = '') {
+  if (isExplicitlyNonEnglishLanguage(explicitLanguage)) return false;
+
+  const cleaned = cleanPostText(text);
+  if (!cleaned) return false;
+
+  if (explicitLanguage.startsWith('en')) return true;
+
+  const letters = cleaned.match(/\p{L}/gu) || [];
+  if (!letters.length) return false;
+
+  const nonLatinLetters = cleaned.match(/[\p{Script=Arabic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Hebrew}\p{Script=Thai}\p{Script=Devanagari}]/gu) || [];
+  if (nonLatinLetters.length / letters.length > 0.2) return false;
+
+  const asciiLetters = cleaned.match(/[A-Za-z]/g) || [];
+  if (asciiLetters.length / letters.length < 0.75) return false;
+
+  const words = cleaned.toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) || [];
+  if (words.length < 4) return asciiLetters.length >= 12;
+
+  const englishMarkers = new Set([
+    'a', 'about', 'after', 'all', 'also', 'am', 'an', 'and', 'are', 'as', 'at',
+    'be', 'been', 'but', 'by', 'can', 'for', 'from', 'get', 'has', 'have',
+    'he', 'her', 'here', 'his', 'how', 'i', 'if', 'in', 'into', 'is', 'it',
+    'its', 'just', 'me', 'my', 'near', 'new', 'not', 'now', 'of', 'on',
+    'or', 'our', 'out', 'over', 'post', 'she', 'so', 'that', 'the', 'their',
+    'there', 'they', 'this', 'to', 'up', 'us', 'was', 'we', 'were', 'what',
+    'when', 'where', 'who', 'will', 'with', 'you', 'your'
+  ]);
+  const markerCount = words.filter((word) => englishMarkers.has(word)).length;
+
+  return markerCount >= 1 || (words.length >= 8 && asciiLetters.length / cleaned.length > 0.55);
 }
 
 function formatPostedAtForSheet(value) {
@@ -166,14 +212,7 @@ function normalizeEntryForSheet(entry, dateGenerated) {
 }
 
 function makeEntryId(entry) {
-  const normalized = normalizeEntryForSheet(entry, '');
-
-  return [
-    normalized.site,
-    normalized.link,
-    normalized.postedAt,
-    normalized.text.slice(0, 250)
-  ].join('|');
+  return makeDedupeKeysForPost(entry)[0] || '';
 }
 
 function getPersistentLog() {
@@ -226,6 +265,7 @@ function getUnsentEntries() {
   const sentIds = getSentIdsForToday();
 
   return log
+    .filter(entry => isPrimarilyEnglishText(collectMeaningfulPostText(entry), entry.language || ''))
     .map(entry => ({
       id: makeEntryId(entry),
       entry
@@ -459,6 +499,55 @@ function isBlockedOrVerificationPage(url = window.location.href) {
   }
 }
 
+function normalizeLinkForDedupe(value) {
+  const raw = cleanPostText(value);
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw, window.location.origin);
+
+    if ((url.hostname === 'www.google.com' || url.hostname === 'google.com') && url.pathname === '/url') {
+      const target = url.searchParams.get('q') || url.searchParams.get('url');
+      if (target) return normalizeLinkForDedupe(target);
+    }
+
+    url.hash = '';
+    [
+      'fbclid',
+      'igsh',
+      'igshid',
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content',
+      'ved',
+      'usg',
+      'sa'
+    ].forEach(param => url.searchParams.delete(param));
+
+    return url.href.replace(/\/$/, '').toLowerCase();
+  } catch (err) {
+    return raw.replace(/\/$/, '').toLowerCase();
+  }
+}
+
+function makeDedupeKeysForPost(post) {
+  const normalized = normalizeEntryForSheet(post, '');
+  const site = (normalized.site || post.platform || '').toLowerCase();
+  const text = cleanPostText(normalized.text).toLowerCase();
+  const postedAt = cleanPostText(normalized.postedAt).toLowerCase();
+  const link = normalizeLinkForDedupe(normalized.link);
+  const id = cleanPostText(post.id).toLowerCase();
+  const keys = [];
+
+  if (link) keys.push(`${site}|link|${link}`);
+  if (id) keys.push(`${site}|id|${id}`);
+  if (text) keys.push(`${site}|text|${postedAt}|${text.slice(0, 250)}`);
+
+  return keys;
+}
+
 function derivePostUrl(element) {
   const selectors = [
     'a[href*="/status/"]',
@@ -544,7 +633,8 @@ function attemptGoogleRobotCheck() {
     const snippet = textFrom(element, SELECTOR_CONFIG.googleSnippet);
     const link = element.querySelector('a[href]')?.href || window.location.href;
     const text = `${title} ${snippet}`.trim();
-    if (!text) return null;
+    const language = getExplicitLanguage(element);
+    if (!text || !isPrimarilyEnglishText(text, language)) return null;
 
     const matchedKeywords = matchesTokens(text, state.keywords.map(normalizeToken));
     const matchedLocations = matchesTokens(text, state.locations);
@@ -553,6 +643,7 @@ function attemptGoogleRobotCheck() {
     return {
       id: `${link}|${title}`.slice(0, 240),
       platform: state.platform,
+      language: language || null,
       user: 'google-result',
       text,
       location: null,
@@ -673,13 +764,14 @@ function attemptGoogleRobotCheck() {
   if (state.platform === 'google') return parseGoogleResult(element);
 
   const text = textFrom(element, SELECTOR_CONFIG.text);
+  const language = getExplicitLanguage(element);
   const user = textFrom(element, SELECTOR_CONFIG.user) || attrFrom(element, SELECTOR_CONFIG.user, 'data-author') || 'unknown';
   const location = textFrom(element, SELECTOR_CONFIG.location);
   const postTime = parseTime(firstMatch(element, SELECTOR_CONFIG.time));
   const postUrl = derivePostUrl(element) || window.location.href;
   const id = derivePostId(element);
 
-  if (!text) return null;
+  if (!text || !isPrimarilyEnglishText(text, language)) return null;
 
   const matchedKeywords = matchesTokens(text, state.keywords.map(normalizeToken));
   const matchedLocations = matchesTokens(`${location} ${text}`, state.locations);
@@ -691,6 +783,7 @@ function attemptGoogleRobotCheck() {
   return {
     id,
     platform: state.platform,
+    language: language || null,
     user,
     text,
     location: location || null,
@@ -739,11 +832,12 @@ function attemptGoogleRobotCheck() {
     const html = await response.text();
     const documentNode = new DOMParser().parseFromString(html, 'text/html');
     const ogDescription = documentNode.querySelector('meta[property="og:description"]')?.getAttribute('content') || '';
+    const language = String(documentNode.documentElement?.getAttribute('lang') || '').trim().toLowerCase();
     const locationLabel = documentNode.querySelector('meta[property="instapp:location:address"]')?.getAttribute('content') || fallbackLocation || '';
     const publishedAt = documentNode.querySelector('time')?.getAttribute('datetime') || null;
     const parsed = parseInstagramMetaDescription(ogDescription);
 
-    if (!parsed.text) return null;
+    if (!parsed.text || !isPrimarilyEnglishText(parsed.text, language)) return null;
 
     const matchedKeywords = matchesTokens(parsed.text, state.keywords.map(normalizeToken));
     const matchedLocations = matchesTokens(`${locationLabel} ${parsed.text}`, state.locations);
@@ -752,6 +846,7 @@ function attemptGoogleRobotCheck() {
     return {
       id: postUrl,
       platform: state.platform,
+      language: language || null,
       user: parsed.user,
       text: parsed.text,
       location: locationLabel || null,
@@ -797,36 +892,23 @@ function attemptGoogleRobotCheck() {
   }
 
   function canonicalPostKey(post) {
-  const normalized = normalizeEntryForSheet(post, '');
-  const site = normalized.site || post.platform || '';
-  const link = cleanPostText(normalized.link).replace(/\/$/, '').toLowerCase();
-
-  if (link) {
-    return `${site}|${link}`;
-  }
-
-  return [
-    site,
-    post.id || '',
-    normalized.postedAt || '',
-    normalized.text.slice(0, 250)
-  ].join('|').toLowerCase();
+  return makeDedupeKeysForPost(post)[0] || '';
 }
 
 function appendWithDedupe(newPosts) {
   if (!newPosts.length) return 0;
 
   const existing = loadStoredPosts();
-  const seen = new Set(existing.map(canonicalPostKey));
+  const seen = new Set(existing.flatMap(makeDedupeKeysForPost));
   let added = 0;
 
   for (const post of newPosts) {
-    const key = canonicalPostKey(post);
+    const keys = makeDedupeKeysForPost(post);
 
-    if (!key || seen.has(key)) continue;
+    if (!keys.length || keys.some((key) => seen.has(key))) continue;
 
     existing.push(post);
-    seen.add(key);
+    keys.forEach((key) => seen.add(key));
     added += 1;
   }
 
