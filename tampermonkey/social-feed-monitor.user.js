@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Socials Lead Generator
 // @namespace    http://tampermonkey.net/
-// @version      2.4.2
+// @version      2.4.3
 // @description  Monitors social/search feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
@@ -317,6 +317,8 @@ function isBlockedOrVerificationPage(url = window.location.href) {
 
   const STORAGE_KEYS = {
     data: LOCAL_POSTS_KEY,
+    keywords: 'sfm_keywords',
+    locations: 'sfm_locations',
     checkInterval: 'sfm_check_interval_ms',
     enabled: 'sfm_enabled',
     autoRotateSearch: 'sfm_auto_rotate_search',
@@ -341,11 +343,11 @@ function isBlockedOrVerificationPage(url = window.location.href) {
 
   const state = {
     platform: detectPlatform(),
-    keywords: [],
-    locations: [],
+    keywords: loadArray(STORAGE_KEYS.keywords, []),
+    locations: loadArray(STORAGE_KEYS.locations, []).map(normalizeToken),
     checkInterval: loadNumber(STORAGE_KEYS.checkInterval, DEFAULTS.checkInterval),
-    enabled: false,
-    autoRotateSearch: true,
+    enabled: loadBoolean(STORAGE_KEYS.enabled, false),
+    autoRotateSearch: loadBoolean(STORAGE_KEYS.autoRotateSearch, true),
     searchIndex: loadNumber(STORAGE_KEYS.searchIndex, 0),
     instagramFetchedUrls: new Set(),
     timer: null,
@@ -386,6 +388,16 @@ function isBlockedOrVerificationPage(url = window.location.href) {
 
   return 'unknown';
 }
+
+  function loadArray(key, fallback) {
+    const value = GM_getValue(key, fallback);
+    return Array.isArray(value) ? value : fallback;
+  }
+
+  function loadBoolean(key, fallback) {
+    const value = GM_getValue(key, fallback);
+    return typeof value === 'boolean' ? value : fallback;
+  }
 
   function loadNumber(key, fallback) {
     const value = Number(GM_getValue(key, fallback));
@@ -1177,6 +1189,8 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
       state.checkInterval = Math.max(MIN_INTERVAL_MS, Math.round(minutes * 60000));
       GM_setValue(STORAGE_KEYS.enabled, true);
       GM_setValue(STORAGE_KEYS.autoRotateSearch, true);
+      GM_setValue(STORAGE_KEYS.keywords, newKeywords);
+      GM_setValue(STORAGE_KEYS.locations, newLocations);
       GM_setValue(STORAGE_KEYS.checkInterval, state.checkInterval);
       logRuntimeEvent('settings_updated', {
         keywordsCount: newKeywords.length,
@@ -1248,12 +1262,14 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
   }
 
   function initialize() {
-    state.enabled = false;
-    GM_setValue(STORAGE_KEYS.enabled, false);
     console.log(`[SFM] Starting on ${state.platform}. Last updated ${LAST_UPDATED}.`);
     logRuntimeEvent('script_initialized', { versionDate: LAST_UPDATED });
     createPopupUI();
-    updateStatusText();
+    if (state.enabled && !state.hardStopped) {
+      startMonitor();
+    } else {
+      updateStatusText();
+    }
   }
 
   initialize();
