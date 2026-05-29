@@ -351,7 +351,7 @@ function isBlockedOrVerificationPage(url = window.location.href) {
   );
 }
 
-  const LAST_UPDATED = '2026-05-28';
+  const LAST_UPDATED = '2026-05-29';
   const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
   const MIN_INTERVAL_MS = 60 * 1000;
 
@@ -393,7 +393,8 @@ function isBlockedOrVerificationPage(url = window.location.href) {
     timer: null,
     ui: null,
     hardStopped: false,
-    activeFetchController: null
+    activeFetchController: null,
+    robotCheckPending: false
   };
 
   function readRuntimeLog() {
@@ -595,26 +596,60 @@ function derivePostId(element) {
 }
 
   
+function notifyManualRobotCheck(frame, details = {}) {
+  if (!state.robotCheckPending) {
+    GM_notification({
+      title: 'Social Feed Monitor',
+      text: 'Google is asking for an “I’m not a robot” check. Please complete it manually, then restart the run.'
+    });
+  }
+
+  state.robotCheckPending = true;
+  frame?.scrollIntoView?.({ behavior: 'smooth', block: 'center', inline: 'center' });
+  state.ui?.panel?.classList.remove('sfm-hidden');
+  updateStatusText();
+  logRuntimeEvent('google_robot_check_manual_required', details);
+}
+
 function attemptGoogleRobotCheck() {
   if (state.platform !== 'google') return false;
+
   const frames = Array.from(document.querySelectorAll('iframe[src*="recaptcha"], iframe[title*="recaptcha" i], iframe[title*="not a robot" i]'));
+  const checkboxSelectors = [
+    '#recaptcha-anchor',
+    '.recaptcha-checkbox[role="checkbox"]',
+    'span[role="checkbox"][aria-labelledby="recaptcha-anchor-label"]',
+    'div[role="checkbox"][aria-label*="robot" i]',
+    'span[role="checkbox"][aria-label*="robot" i]'
+  ];
+
   for (const frame of frames) {
     try {
       const doc = frame.contentDocument || frame.contentWindow?.document;
-      if (!doc) continue;
-      const checkbox =
-        doc.querySelector('#recaptcha-anchor') ||
-        doc.querySelector('div[role="checkbox"][aria-label*="robot" i]') ||
-        doc.querySelector('span[role="checkbox"][aria-label*="robot" i]');
-      if (checkbox) {
-        checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-        logRuntimeEvent('google_robot_check_clicked', { frameTitle: frame.title || null });
+      if (!doc) {
+        notifyManualRobotCheck(frame, { frameTitle: frame.title || null, inaccessible: true });
+        return true;
+      }
+
+      const checkbox = checkboxSelectors.map((selector) => doc.querySelector(selector)).find(Boolean);
+      if (checkbox && checkbox.getAttribute('aria-checked') !== 'true') {
+        notifyManualRobotCheck(frame, {
+          frameTitle: frame.title || null,
+          selector: checkboxSelectors.find((selector) => doc.querySelector(selector) === checkbox) || null
+        });
         return true;
       }
     } catch (error) {
-      logRuntimeEvent('google_robot_check_inaccessible_frame', { message: String(error) });
+      notifyManualRobotCheck(frame, {
+        frameTitle: frame.title || null,
+        inaccessible: true,
+        message: String(error)
+      });
+      return true;
     }
   }
+
+  state.robotCheckPending = false;
   return false;
 }
 
@@ -1066,7 +1101,7 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
   state.activeFetchController = new AbortController();
 
   try {
-    attemptGoogleRobotCheck();
+    if (attemptGoogleRobotCheck()) return;
 
     const parsed = allPosts().map(parsePost).filter(Boolean);
     if (state.platform === 'google' && parsed.length > 0) {
@@ -1170,6 +1205,7 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
       `Areas: ${state.locations.join(', ') || '(none)'}`,
       `Check interval: ${Math.round(state.checkInterval / 60000)} minute(s)`,
       `Auto-rotate search pages: ${state.autoRotateSearch ? 'On' : 'Off'}`,
+      `Robot check: ${state.robotCheckPending ? 'Manual action required' : 'Clear'}`,
       `Last updated: ${LAST_UPDATED}`
     ];
   }
@@ -1177,6 +1213,7 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
   function updateStatusText() {
     if (!state.ui?.status) return;
     state.ui.status.textContent = statusLines().join('\n');
+    state.ui.status.classList.toggle('sfm-warning', Boolean(state.robotCheckPending));
   }
 
   function createPopupUI() {
@@ -1195,6 +1232,7 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
       #sfm-panel button.sfm-primary{background:#0a66c2;color:#fff;border-color:#0a66c2}
       #sfm-panel button.sfm-danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
       #sfm-status{white-space:pre-wrap;background:#f5f7fa;border-radius:8px;padding:8px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px}
+      #sfm-status.sfm-warning{background:#fff7ed;border:1px solid #fdba74;color:#7c2d12}
     `;
     document.head.appendChild(style);
 
@@ -1264,6 +1302,7 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
       }
 
       state.hardStopped = false;
+      state.robotCheckPending = false;
       state.enabled = true;
       state.autoRotateSearch = true;
       state.keywords = newKeywords;
