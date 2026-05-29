@@ -114,13 +114,16 @@ function rowHasUsefulData(row) {
 
 function makeDedupeKeysFromRow(row) {
   const site = cleanCellText(row[1]).toLowerCase();
-  const text = cleanCellText(row[2]).toLowerCase();
+  const text = normalizeTextForDedupe(row[2]);
   const postedAt = cleanCellText(row[3]).toLowerCase();
   const link = normalizeLinkForDedupe(row[4]);
   const keys = [];
 
-  if (link) keys.push(`${site}|link|${link}`);
-  if (text) keys.push(`${site}|text|${postedAt}|${text.slice(0, 250)}`);
+  if (link) keys.push(`link|${link}`);
+  if (text) {
+    keys.push(`text|${text.slice(0, 250)}`);
+    if (postedAt) keys.push(`${site}|text-date|${postedAt}|${text.slice(0, 250)}`);
+  }
 
   return keys;
 }
@@ -169,6 +172,7 @@ function normalizeLinkForDedupe(value) {
       'sa'
     ].forEach(param => url.searchParams.delete(param));
 
+    url.hostname = url.hostname.replace(/^m\./, 'www.');
     return url.href.replace(/\/$/, '').toLowerCase();
   } catch (err) {
     return raw.replace(/\/$/, '').toLowerCase();
@@ -243,12 +247,24 @@ function normalizeSite(site, link) {
   const rawLink = String(link || '').trim().toLowerCase();
   const combined = `${rawSite} ${rawLink}`;
 
+  if (combined.includes('tiktok.com') || combined.includes('tiktok')) {
+    return 'TikTok';
+  }
+
   if (combined.includes('instagram.com') || combined.includes('instagram')) {
     return 'Instagram';
   }
 
   if (combined.includes('facebook.com') || combined.includes('facebook')) {
     return 'Facebook';
+  }
+
+  if (combined.includes('yelp.')) {
+    return 'Yelp';
+  }
+
+  if (combined.includes('google.com') || combined.includes('google')) {
+    return 'Google Search';
   }
 
   if (
@@ -268,8 +284,18 @@ function cleanCellText(value) {
 
   return String(value)
     .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeTextForDedupe(value) {
+  return cleanCellText(value)
+    .toLowerCase()
+    .replace(/\b(read more|see more)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\u200b-\u200d\ufeff]/g, '')
     .trim();
 }
 

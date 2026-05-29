@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Socials Lead Generator
 // @namespace    http://tampermonkey.net/
-// @version      2.4.4
+// @version      2.4.5
 // @description  Monitors social/search feeds for keyword/location matches and stores results locally for export.
 // @author       IWATQH
 // @match        https://www.x.com/*
@@ -51,8 +51,18 @@ function cleanPostText(value) {
 
   return String(value)
     .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeTextForDedupe(value) {
+  return cleanPostText(value)
+    .toLowerCase()
+    .replace(/\b(read more|see more)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\u200b-\u200d\ufeff]/g, '')
     .trim();
 }
 
@@ -152,12 +162,24 @@ function normalizeSiteForSheet(site, link) {
   const rawLink = String(link || '').trim().toLowerCase();
   const combined = `${rawSite} ${rawLink}`;
 
+  if (combined.includes('tiktok.com') || combined.includes('tiktok')) {
+    return 'TikTok';
+  }
+
   if (combined.includes('instagram.com') || combined.includes('instagram')) {
     return 'Instagram';
   }
 
   if (combined.includes('facebook.com') || combined.includes('facebook')) {
     return 'Facebook';
+  }
+
+  if (combined.includes('yelp.')) {
+    return 'Yelp';
+  }
+
+  if (combined.includes('google.com') || combined.includes('google')) {
+    return 'Google Search';
   }
 
   if (
@@ -264,13 +286,22 @@ function getUnsentEntries() {
   const log = getPersistentLog();
   const sentIds = getSentIdsForToday();
 
-  return log
-    .filter(entry => isPrimarilyEnglishText(collectMeaningfulPostText(entry), entry.language || ''))
-    .map(entry => ({
-      id: makeEntryId(entry),
-      entry
-    }))
-    .filter(item => item.id && !sentIds.has(item.id));
+  const unsent = [];
+  const seenThisPayload = new Set();
+
+  for (const entry of log) {
+    if (!isPrimarilyEnglishText(collectMeaningfulPostText(entry), entry.language || '')) continue;
+
+    const keys = makeDedupeKeysForPost(entry);
+    const id = keys[0] || '';
+
+    if (!id || keys.some((key) => sentIds.has(key) || seenThisPayload.has(key))) continue;
+
+    keys.forEach((key) => seenThisPayload.add(key));
+    unsent.push({ id, keys, entry });
+  }
+
+  return unsent;
 }
 
 function markEntriesSent(items) {
@@ -279,7 +310,8 @@ function markEntriesSent(items) {
   const sentIds = new Set(map[today] || []);
 
   for (const item of items) {
-    sentIds.add(item.id);
+    const keys = Array.isArray(item.keys) && item.keys.length ? item.keys : [item.id];
+    keys.forEach((key) => sentIds.add(key));
   }
 
   map[today] = Array.from(sentIds);
@@ -527,24 +559,33 @@ function normalizeLinkForDedupe(value) {
       'sa'
     ].forEach(param => url.searchParams.delete(param));
 
+    url.hostname = url.hostname.replace(/^m\./, 'www.');
     return url.href.replace(/\/$/, '').toLowerCase();
   } catch (err) {
     return raw.replace(/\/$/, '').toLowerCase();
   }
 }
 
+function getPrimaryDedupeLink(post) {
+  const normalized = normalizeEntryForSheet(post, '');
+  return normalizeLinkForDedupe(normalized.link || post.url || post.link || '');
+}
+
 function makeDedupeKeysForPost(post) {
   const normalized = normalizeEntryForSheet(post, '');
   const site = (normalized.site || post.platform || '').toLowerCase();
-  const text = cleanPostText(normalized.text).toLowerCase();
+  const text = normalizeTextForDedupe(normalized.text);
   const postedAt = cleanPostText(normalized.postedAt).toLowerCase();
-  const link = normalizeLinkForDedupe(normalized.link);
+  const link = getPrimaryDedupeLink(post);
   const id = cleanPostText(post.id).toLowerCase();
   const keys = [];
 
-  if (link) keys.push(`${site}|link|${link}`);
+  if (link) keys.push(`link|${link}`);
   if (id) keys.push(`${site}|id|${id}`);
-  if (text) keys.push(`${site}|text|${postedAt}|${text.slice(0, 250)}`);
+  if (text) {
+    keys.push(`text|${text.slice(0, 250)}`);
+    if (postedAt) keys.push(`text-date|${postedAt}|${text.slice(0, 250)}`);
+  }
 
   return keys;
 }
@@ -663,20 +704,36 @@ function attemptGoogleRobotCheck() {
     return tokens.filter((token) => token && normalized.includes(token));
   }
 
+  function getGoogleResultLink(element) {
+    const links = Array.from(element.querySelectorAll('a[href]'));
+
+    for (const anchor of links) {
+      const href = anchor.href || anchor.getAttribute('href') || '';
+      const normalized = normalizeLinkForDedupe(href);
+      if (!normalized) continue;
+      if (normalized.includes('google.com/search')) continue;
+      if (normalized.includes('google.com/preferences')) continue;
+      if (normalized.includes('google.com/webhp')) continue;
+      return href;
+    }
+
+    return '';
+  }
+
   function parseGoogleResult(element) {
     const title = textFrom(element, SELECTOR_CONFIG.googleTitle);
     const snippet = textFrom(element, SELECTOR_CONFIG.googleSnippet);
-    const link = element.querySelector('a[href]')?.href || window.location.href;
+    const link = getGoogleResultLink(element);
     const text = `${title} ${snippet}`.trim();
     const language = getExplicitLanguage(element);
-    if (!text || !isPrimarilyEnglishText(text, language)) return null;
+    if (!link || !text || !isPrimarilyEnglishText(text, language)) return null;
 
     const matchedKeywords = matchesTokens(text, state.keywords.map(normalizeToken));
     const matchedLocations = matchesTokens(text, state.locations);
     if (matchedKeywords.length === 0 || matchedLocations.length === 0) return null;
 
     return {
-      id: `${link}|${title}`.slice(0, 240),
+      id: normalizeLinkForDedupe(link) || `${link}|${title}`.slice(0, 240),
       platform: state.platform,
       language: language || null,
       user: 'google-result',
@@ -955,6 +1012,24 @@ function appendWithDedupe(newPosts) {
 }
 
 
+
+function dedupePostsForCurrentScrape(posts) {
+  if (!posts.length) return posts;
+
+  const seen = new Set();
+  const unique = [];
+
+  for (const post of posts) {
+    const keys = makeDedupeKeysForPost(post);
+    if (!keys.length || keys.some((key) => seen.has(key))) continue;
+
+    keys.forEach((key) => seen.add(key));
+    unique.push(post);
+  }
+
+  return unique;
+}
+
 function locationsCongruent(post) {
   if (!state.locations.length) return true;
 
@@ -1103,7 +1178,7 @@ function filterPostsOlderThanSixMonths(posts, now = new Date()) {
   try {
     if (attemptGoogleRobotCheck()) return;
 
-    const parsed = allPosts().map(parsePost).filter(Boolean);
+    const parsed = dedupePostsForCurrentScrape(allPosts().map(parsePost).filter(Boolean));
     if (state.platform === 'google' && parsed.length > 0) {
       for (let i = 0; i < parsed.length; i += 1) {
         if (state.hardStopped) break;
